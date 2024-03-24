@@ -1659,6 +1659,12 @@ mode_changed:
 	return 0;
 }
 
+static void cdns_mhdp_connector_oob_hotplug_event(struct drm_connector *conn)
+{
+	struct cdns_mhdp_device *mhdp = connector_to_mhdp(conn);
+	schedule_work(&mhdp->hpd_work);
+}
+
 static const struct drm_connector_helper_funcs cdns_mhdp_conn_helper_funcs = {
 	.detect_ctx = cdns_mhdp_connector_detect,
 	.get_modes = cdns_mhdp_get_modes,
@@ -1672,6 +1678,7 @@ static const struct drm_connector_funcs cdns_mhdp_conn_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.reset = drm_atomic_helper_connector_reset,
 	.destroy = drm_connector_cleanup,
+	.oob_hotplug_event = cdns_mhdp_connector_oob_hotplug_event,
 };
 
 static int cdns_mhdp_connector_init(struct cdns_mhdp_device *mhdp)
@@ -1687,6 +1694,7 @@ static int cdns_mhdp_connector_init(struct cdns_mhdp_device *mhdp)
 	}
 
 	conn->polled = DRM_CONNECTOR_POLL_HPD;
+	conn->fwnode = dev_fwnode(mhdp->dev);
 
 	ret = drm_connector_init(bridge->dev, conn, &cdns_mhdp_conn_funcs,
 				 DRM_MODE_CONNECTOR_DisplayPort);
