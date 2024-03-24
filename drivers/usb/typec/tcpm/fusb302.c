@@ -82,6 +82,7 @@ struct fusb302_chip {
 	struct work_struct irq_work;
 	bool irq_suspended;
 	bool irq_while_suspended;
+	bool irq_edge_triggered;
 	struct gpio_desc *gpio_int_n;
 	int gpio_int_n_irq;
 	struct extcon_dev *extcon;
@@ -1478,7 +1479,8 @@ static irqreturn_t fusb302_irq_intn(int irq, void *dev_id)
 	unsigned long flags;
 
 	/* Disable our level triggered IRQ until our irq_work has cleared it */
-	disable_irq_nosync(chip->gpio_int_n_irq);
+	if (!chip->irq_edge_triggered)
+		disable_irq_nosync(chip->gpio_int_n_irq);
 
 	spin_lock_irqsave(&chip->irq_lock, flags);
 	if (chip->irq_suspended)
@@ -1622,7 +1624,10 @@ static void fusb302_irq_work(struct work_struct *work)
 	}
 done:
 	mutex_unlock(&chip->lock);
-	enable_irq(chip->gpio_int_n_irq);
+	if (!chip->irq_edge_triggered)
+		enable_irq(chip->gpio_int_n_irq);
+	else if (!gpiod_get_value(chip->gpio_int_n))
+		schedule_work(&chip->irq_work);
 }
 
 static int init_gpio(struct fusb302_chip *chip)
@@ -1751,12 +1756,23 @@ static int fusb302_probe(struct i2c_client *client,
 	ret = request_irq(chip->gpio_int_n_irq, fusb302_irq_intn,
 			  IRQF_ONESHOT | IRQF_TRIGGER_LOW,
 			  "fsc_interrupt_int_n", chip);
+	if (ret < 0 && chip->gpio_int_n) {
+		dev_err(dev, "cannot request IRQ for GPIO Int_N, "
+			"attempting to use edge triggering ret=%d", ret);
+		chip->irq_edge_triggered = true;
+		ret = request_irq(chip->gpio_int_n_irq, fusb302_irq_intn,
+				  IRQF_TRIGGER_FALLING,
+				  "fsc_interrupt_int_n", chip);
+	}
 	if (ret < 0) {
 		dev_err(dev, "cannot request IRQ for GPIO Int_N, ret=%d", ret);
 		goto tcpm_unregister_port;
 	}
 	enable_irq_wake(chip->gpio_int_n_irq);
 	i2c_set_clientdata(client, chip);
+	if (chip->irq_edge_triggered && !gpiod_get_value(chip->gpio_int_n)) {
+		schedule_work(&chip->irq_work);
+	}
 
 	return ret;
 
