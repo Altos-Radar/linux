@@ -1561,6 +1561,10 @@
 			phys = <&dphy_rx0>;
 			phy-names = "dphy";
 			power-domains = <&k3_pds 38 TI_SCI_PD_EXCLUSIVE>;
+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "irq", "err_irq", "level";
 
 			ports {
 				#address-cells = <1>;
@@ -1618,6 +1622,10 @@
 			phys = <&dphy_rx1>;
 			phy-names = "dphy";
 			power-domains = <&k3_pds 39 TI_SCI_PD_EXCLUSIVE>;
+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "irq", "err_irq", "level";
 
 			ports {
 				#address-cells = <1>;
