@@ -1322,6 +1322,10 @@
 				      "pixel_if1_clk", "pixel_if2_clk", "pixel_if3_clk";
 			phys = <&dphy0>;
 			phy-names = "dphy";
+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "irq", "err_irq", "level";
 
 			ports {
 				#address-cells = <1>;
@@ -1378,6 +1382,10 @@
 				      "pixel_if1_clk", "pixel_if2_clk", "pixel_if3_clk";
 			phys = <&dphy1>;
 			phy-names = "dphy";
+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "irq", "err_irq", "level";
 
 			ports {
 				#address-cells = <1>;
