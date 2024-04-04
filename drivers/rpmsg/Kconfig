@@ -94,4 +94,17 @@ config RPMSG_PRU
 
 	  If unsure, say N.
 
+config RPMSG_VIDEOBUF
+	tristate "RPMsg Videobuf driver"
+	depends on RPMSG_VIRTIO
+	depends on REMOTEPROC
+	select VIDEOBUF2_DMA_CONTIG
+	select VIDEOBUF2_V4L2
+	help
+	  An rpmsg driver that exposes a v4l2/videobuf2 interface over rpmsg,
+	  effective for applications that want a v4l2 video streaming interface.
+	  This allows zero-copy sharing of buffers over rpmsg with DMABUF support.
+
+	  If unsure, say N.
+
 endmenu
