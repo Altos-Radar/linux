@@ -1,0 +1,776 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2021 Texas Instruments Incorporated - https://www.ti.com/
+ *
+ * Common Processor Board: https://www.ti.com/tool/J721EXCPXEVM
+ */
+
+/dts-v1/;
+
+#include "k3-j721s2-som-p0.dtsi"
+#include <dt-bindings/net/ti-dp83867.h>
+#include <dt-bindings/phy/phy-cadence.h>
+#include <dt-bindings/phy/phy.h>
+#include <dt-bindings/mux/ti-serdes.h>
+#include <dt-bindings/usb/pd.h>
+
+/ {
+	compatible = "ti,j721s2-evm", "ti,j721s2";
+	model = "Texas Instruments J721S2 EVM";
+
+	chosen {
+		//stdout-path = "serial2:115200n8";
+		bootargs = "console=ttyS2,115200n8 mitigations=off root=/dev/mmcblk0p2";
+	};
+
+	aliases {
+		serial0 = &wkup_uart0;
+		serial1 = &mcu_uart0;
+		serial2 = &main_uart5;
+		mmc0 = &main_sdhci0;
+		mmc1 = &main_sdhci1;
+		can0 = &main_mcan16;
+		can1 = &mcu_mcan0;
+		can2 = &mcu_mcan1;
+		can3 = &main_mcan3;
+		can4 = &main_mcan5;
+	};
+
+	evm_12v0: fixedregulator-evm12v0 {
+		/* main supply */
+		compatible = "regulator-fixed";
+		regulator-name = "evm_12v0";
+		regulator-min-microvolt = <12000000>;
+		regulator-max-microvolt = <12000000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vsys_3v3: fixedregulator-vsys3v3 {
+		/* Output of LM5140 */
+		compatible = "regulator-fixed";
+		regulator-name = "vsys_3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&evm_12v0>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	csi_vc0: csi-vc0 {
+		compatible = "csi-vc";
+		port {
+			csi0_vc0_ep: endpoint {
+				remote-endpoint = <&csi2rx0_in0>;
+				clock-lanes = <0>;
+				data-lanes = <1 2 3 4>;
+			};
+		};
+	};
+
+	csi_vc1: csi-vc1 {
+		compatible = "csi-vc";
+		port {
+			csi1_vc0_ep: endpoint {
+				remote-endpoint = <&csi2rx1_in0>;
+				clock-lanes = <0>;
+				data-lanes = <1 2 3 4>;
+			};
+		};
+	};
+};
+
+&main_spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_spi0_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	awr_spi_1: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&main_spi2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_spi2_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	awr_spi_2: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&main_spi3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_spi3_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	awr_spi_3: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&main_spi5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_spi5_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	awr_spi_4: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&mcu_spi0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcu_spi0_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	fpga_1: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <110000000>;
+	};
+};
+
+&mcu_spi1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcu_spi1_pins_default>;
+	ti,spi-num-cs = <1>;
+
+	fpga_2: spi@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <110000000>;
+	};
+};
+
+&main_i2c1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_i2c1_pins_default>;
+	clock-frequency = <400000>;
+
+	fusb302@22 {
+		compatible = "fcs,fusb302";
+		reg = <0x22>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&fusb302_cc_int>;
+		fcs,int_n-gpios = <&main_gpio0 10 GPIO_ACTIVE_HIGH>;
+
+		port {
+			typec_drd_sw: endpoint {
+				remote-endpoint = <&usb0_drd_sw>;
+			};
+		};
+
+		typec_con: connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			power-role = "sink";
+			data-role = "dual";
+			op-sink-microwatt = <27000000>;
+			sink-pdos = <
+				PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM | PDO_FIXED_DATA_SWAP)
+				PDO_FIXED(20000, 3000,
+					PDO_FIXED_HIGHER_CAP |
+					PDO_FIXED_USB_COMM |
+					PDO_FIXED_DATA_SWAP)
+				PDO_VAR(9000, 20000, 3000)>;
+			displayport = <&mhdp>;
+
+			altmodes {
+				displayport {
+					svid = <0xff01>;
+					vdo = <0x00001846>;
+				};
+			};
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@1 {
+					reg = <1>;
+					usb_conn_ss: endpoint {
+						remote-endpoint = <&usb0_ss_ep>;
+					};
+				};
+
+				port@2 {
+					reg = <2>;
+					dp_conn: endpoint {
+						remote-endpoint = <&dp0_out>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&main_mcan16 {
+	status = "disabled";
+};
+
+&main_pmx0 {
+	main_uart5_pins_default: main-uart5-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x008, PIN_INPUT, 11) /* (AC24) MCAN12_RX.UART5_RXD */
+			J721S2_IOPAD(0x004, PIN_OUTPUT, 11) /* (W25) MCAN12_TX.UART5_TXD */
+		>;
+	};
+
+	main_uart3_pins_default: main-uart3pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x078, PIN_INPUT, 11) /* (Y25) MCAN_RX.UART3_RXD */
+			J721S2_IOPAD(0x074, PIN_OUTPUT, 11) /* (R28) MCAN_TX.UART3_TXD */
+		>;
+	};
+
+	main_i2c1_pins_default: main-i2c1-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x020, PIN_INPUT_PULLUP, 12) /* (AA23) MCAN15_RX.I2C1_SCL */
+			J721S2_IOPAD(0x024, PIN_INPUT_PULLUP, 12) /* (Y28) MCAN16_TX.I2C1_SDA */
+		>;
+	};
+	fusb302_cc_int: fusb302-cc-int {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x028, PIN_INPUT_PULLUP, 7) /* (AB24) MCAN16_RX.GPIO0_10 */
+		>;
+	};
+	main_i2c3_pins_default: main-i2c3-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x064, PIN_INPUT_PULLUP, 13) /* (W28) MCAN0_TX.I2C3_SCL */
+			J721S2_IOPAD(0x060, PIN_INPUT_PULLUP, 13) /* (AC27) MCASP2_AXR1.I2C3_SDA */
+		>;
+	};
+
+	vdd_sd_dv_pins_default: vdd-sd-dv-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x020, PIN_INPUT, 7) /* (AA23) MCAN15_RX.GPIO0_8 */
+		>;
+	};
+
+	main_usbss0_pins_default: main-usbss0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x0ec, PIN_OUTPUT, 6) /* (AG25) TIMER_IO1.USB0_DRVVBUS */
+		>;
+	};
+
+	main_spi0_pins_default: main-spi0-pins-default {
+		pinctrl-single,pins = <
+			/* PMIC Enable */
+			J721S2_IOPAD(0x038, PIN_OUTPUT, 7) /* (AB28) MCASP0_ACLKX.GPIO0_14 */
+
+			/* SOP */
+			J721S2_IOPAD(0x048, PIN_OUTPUT, 7) /* (AB27) MCASP0_AXR2.GPIO0_18 */
+			J721S2_IOPAD(0x044, PIN_OUTPUT, 7) /* (Y26) MCASP0_AXR1.GPIO0_17 */
+			J721S2_IOPAD(0x040, PIN_OUTPUT, 7) /* (AC28) MCASP0_AXR0.GPIO0_16 */
+
+			/* AWR 1 */
+			J721S2_IOPAD(0x0d4, PIN_OUTPUT, 0) /* (AH27) SPI0_CLK.SPI0_CLK */
+			J721S2_IOPAD(0x0cc, PIN_OUTPUT, 0) /* (AE27) SPI0_CS0.SPI0_CS0 */
+			J721S2_IOPAD(0x0d8, PIN_INPUT, 0)  /* (AG26) SPI0_D0.SPI0_D0 */
+			J721S2_IOPAD(0x0dc, PIN_OUTPUT, 0) /* (AH26) SPI0_D1.SPI0_D1 */
+
+			/* Host Interrupt */
+			J721S2_IOPAD(0x000, PIN_INPUT, 7) /* (AG24) EXTINTn.GPIO0_0 */
+
+			/* Reset */
+			J721S2_IOPAD(0x054, PIN_OUTPUT, 7) /* (Y27) MCASP2_ACLKX.GPIO0_21 */
+		>;
+	};
+
+	main_spi2_pins_default: main-spi2-pins-default {
+		pinctrl-single,pins = <
+			/* AWR 2 */
+			J721S2_IOPAD(0x0a0, PIN_OUTPUT, 10) /* (AB25) MCASP0_AXR12.SPI2_CLK */
+			J721S2_IOPAD(0x0a4, PIN_OUTPUT, 10) /* (T23)  MCASP0_AXR13.SPI2_CS0 */
+			J721S2_IOPAD(0x0a8, PIN_INPUT,  10) /* (U24)  MCASP0_AXR14.SPI2_D0 */
+			J721S2_IOPAD(0x0ac, PIN_OUTPUT, 10) /* (AC25) MCASP0_AXR15.SPI2_D1 */
+
+			/* Host Interrupt */
+			J721S2_IOPAD(0x09c, PIN_INPUT, 7) /* (T24) MCASP0_AXR11.GPIO0_39 */
+
+			/* Reset */
+			J721S2_IOPAD(0x058, PIN_OUTPUT, 7) /* (AA27) MCASP2_AFSX.GPIO0_22 */
+		>;
+	};
+
+	main_spi3_pins_default: main-spi3-pins-default {
+		pinctrl-single,pins = <
+			/* AWR 3 */
+			J721S2_IOPAD(0x0bc, PIN_OUTPUT, 8) /* (V28) MCASP1_AFSX.SPI3_CS0 */
+			J721S2_IOPAD(0x0c0, PIN_OUTPUT, 8) /* (T28) MCASP1_AXR0.SPI3_CLK */
+			J721S2_IOPAD(0x04c, PIN_INPUT,  8) /* (V27) MCASP1_AXR1.SPI3_D0 */
+			J721S2_IOPAD(0x050, PIN_OUTPUT, 8) /* (W27) MCASP1_AXR2.SPI3_D1 */
+
+			/* Host Interrupt */
+			J721S2_IOPAD(0x02c, PIN_INPUT, 7) /* (V23) GPIO0_11 */
+
+			/* Reset */
+			J721S2_IOPAD(0x05c, PIN_OUTPUT, 7) /* (AA26) MCASP2_AXR0.GPIO0_23 */
+		>;
+	};
+
+	main_spi5_pins_default: main-spi5-pins-default {
+		pinctrl-single,pins = <
+			/* AWR 4 */
+			J721S2_IOPAD(0x068, PIN_OUTPUT, 8)  /* (U28) MCAN0_RX.SPI5_CS0 */
+			J721S2_IOPAD(0x070, PIN_INPUT,  8)  /* (R27) MCAN1_RX.SPI5_D0 */
+			J721S2_IOPAD(0x07c, PIN_OUTPUT, 8)  /* (T27) MCASP0_AXR3.SPI5_CLK */
+			J721S2_IOPAD(0x088, PIN_OUTPUT, 11) /* (AD27) MCASP0_AXR6.SPI5_D1 */
+
+			/* Host Interrupt */
+			J721S2_IOPAD(0x08c, PIN_INPUT, 7) /* (T25) MCASP0_AXR7.GPIO0_35 */
+
+			/* Reset */
+			J721S2_IOPAD(0x060, PIN_OUTPUT, 7) /* (AC27) MCASP2_AXR1.GPIO0_24 */
+		>;
+	};
+
+	dp0_pins_default: dp0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_IOPAD(0x0b8, PIN_INPUT_PULLUP, 3) /* (AA24) MCASP1_ACLKX.DP0_HPD */
+		>;
+	};
+};
+
+&wkup_pmx1 {
+};
+
+&wkup_pmx2 {
+	mcu_cpsw_pins_default: mcu-cpsw-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x02c, PIN_INPUT, 0) /* (B22) MCU_RGMII1_RD0 */
+			J721S2_WKUP_IOPAD(0x028, PIN_INPUT, 0) /* (B21) MCU_RGMII1_RD1 */
+			J721S2_WKUP_IOPAD(0x024, PIN_INPUT, 0) /* (C22) MCU_RGMII1_RD2 */
+			J721S2_WKUP_IOPAD(0x020, PIN_INPUT, 0) /* (D23) MCU_RGMII1_RD3 */
+			J721S2_WKUP_IOPAD(0x01c, PIN_INPUT, 0) /* (D22) MCU_RGMII1_RXC */
+			J721S2_WKUP_IOPAD(0x004, PIN_INPUT, 0) /* (E23) MCU_RGMII1_RX_CTL */
+			J721S2_WKUP_IOPAD(0x014, PIN_OUTPUT, 0) /* (F23) MCU_RGMII1_TD0 */
+			J721S2_WKUP_IOPAD(0x010, PIN_OUTPUT, 0) /* (G22) MCU_RGMII1_TD1 */
+			J721S2_WKUP_IOPAD(0x00c, PIN_OUTPUT, 0) /* (E21) MCU_RGMII1_TD2 */
+			J721S2_WKUP_IOPAD(0x008, PIN_OUTPUT, 0) /* (E22) MCU_RGMII1_TD3 */
+			J721S2_WKUP_IOPAD(0x018, PIN_OUTPUT, 0) /* (F21) MCU_RGMII1_TXC */
+			J721S2_WKUP_IOPAD(0x000, PIN_OUTPUT, 0) /* (F22) MCU_RGMII1_TX_CTL */
+		>;
+	};
+
+	mcu_mdio_pins_default: mcu-mdio-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x034, PIN_OUTPUT, 0) /* (A21) MCU_MDIO0_MDC */
+			J721S2_WKUP_IOPAD(0x030, PIN_INPUT, 0) /* (A22) MCU_MDIO0_MDIO */
+		>;
+	};
+
+	mcu_mcan0_pins_default: mcu-mcan0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x054, PIN_INPUT, 0) /* (E28) MCU_MCAN0_RX */
+			J721S2_WKUP_IOPAD(0x050, PIN_OUTPUT, 0) /* (E27) MCU_MCAN0_TX */
+		>;
+	};
+
+	mcu_mcan1_pins_default: mcu-mcan1-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x06c, PIN_INPUT, 0) /* (F26) WKUP_GPIO0_5.MCU_MCAN1_RX */
+			J721S2_WKUP_IOPAD(0x068, PIN_OUTPUT, 0) /* (C23) WKUP_GPIO0_4.MCU_MCAN1_TX */
+		>;
+	};
+
+	mcu_adc0_pins_default: mcu-adc0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x0cc, PIN_INPUT, 0) /* (L25) MCU_ADC0_AIN0 */
+			J721S2_WKUP_IOPAD(0x0d0, PIN_INPUT, 0) /* (K25) MCU_ADC0_AIN1 */
+			J721S2_WKUP_IOPAD(0x0d4, PIN_INPUT, 0) /* (M24) MCU_ADC0_AIN2 */
+			J721S2_WKUP_IOPAD(0x0d8, PIN_INPUT, 0) /* (L24) MCU_ADC0_AIN3 */
+			J721S2_WKUP_IOPAD(0x0dc, PIN_INPUT, 0) /* (L27) MCU_ADC0_AIN4 */
+			J721S2_WKUP_IOPAD(0x0e0, PIN_INPUT, 0) /* (K24) MCU_ADC0_AIN5 */
+			J721S2_WKUP_IOPAD(0x0e4, PIN_INPUT, 0) /* (M27) MCU_ADC0_AIN6 */
+			J721S2_WKUP_IOPAD(0x0e8, PIN_INPUT, 0) /* (M26) MCU_ADC0_AIN7 */
+		>;
+	};
+
+	mcu_adc1_pins_default: mcu-adc1-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x0ec, PIN_INPUT, 0) /* (P25) MCU_ADC1_AIN0 */
+			J721S2_WKUP_IOPAD(0x0f0, PIN_INPUT, 0) /* (R25) MCU_ADC1_AIN1 */
+			J721S2_WKUP_IOPAD(0x0f4, PIN_INPUT, 0) /* (P28) MCU_ADC1_AIN2 */
+			J721S2_WKUP_IOPAD(0x0f8, PIN_INPUT, 0) /* (P27) MCU_ADC1_AIN3 */
+			J721S2_WKUP_IOPAD(0x0fc, PIN_INPUT, 0) /* (N25) MCU_ADC1_AIN4 */
+			J721S2_WKUP_IOPAD(0x100, PIN_INPUT, 0) /* (P26) MCU_ADC1_AIN5 */
+			J721S2_WKUP_IOPAD(0x104, PIN_INPUT, 0) /* (N26) MCU_ADC1_AIN6 */
+			J721S2_WKUP_IOPAD(0x108, PIN_INPUT, 0) /* (N27) MCU_ADC1_AIN7 */
+		>;
+	};
+
+	mcu_uart0_pins_default: mcu-uart0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x090, PIN_INPUT, 0) /* (B24) WKUP_GPIO0_14.MCU_UART0_CTSn */
+			J721S2_WKUP_IOPAD(0x094, PIN_OUTPUT, 0) /* (D25) WKUP_GPIO0_15.MCU_UART0_RTSn */
+			J721S2_WKUP_IOPAD(0x08c, PIN_INPUT, 0) /* (C24) WKUP_GPIO0_13.MCU_UART0_RXD */
+			J721S2_WKUP_IOPAD(0x088, PIN_OUTPUT, 0) /* (C25) WKUP_GPIO0_12.MCU_UART0_TXD */
+		>;
+	};
+
+	wkup_uart0_pins_default: wkup-uart0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x070, PIN_INPUT, 0) /* (E25) WKUP_GPIO0_6.WKUP_UART0_CTSn */
+			J721S2_WKUP_IOPAD(0x074, PIN_OUTPUT, 0) /* (F28) WKUP_GPIO0_7.WKUP_UART0_RTSn */
+			J721S2_WKUP_IOPAD(0x048, PIN_INPUT, 0) /* (D28) WKUP_UART0_RXD */
+			J721S2_WKUP_IOPAD(0x04c, PIN_OUTPUT, 0) /* (D27) WKUP_UART0_TXD */
+		>;
+	};
+
+	mcu_spi0_pins_default: mcu-spi0-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x038, PIN_OUTPUT, 0) /* (B27) MCU_SPI0_CLK */
+			J721S2_WKUP_IOPAD(0x03C, PIN_INPUT, 0)  /* (D24) MCU_SPI0_D0 */
+			J721S2_WKUP_IOPAD(0x040, PIN_OUTPUT, 0) /* (B25) MCU_SPI0_D1 */
+			J721S2_WKUP_IOPAD(0x044, PIN_OUTPUT_PULLUP, 7) /* (B26) MCU_SPI0_CS0.WKUP_GPIO0_70 */
+
+			/* FPGA CRESETN */
+			J721S2_WKUP_IOPAD(0x080, PIN_OUTPUT, 7) /* (F27) WKUP_GPIO0_10 */
+
+			/* FPGA CDONE */
+			J721S2_WKUP_IOPAD(0x078, PIN_INPUT_PULLUP, 7) /* (F24) WKUP_GPIO0_8 */
+		>;
+	};
+
+	mcu_spi1_pins_default: mcu-spi1-pins-default {
+		pinctrl-single,pins = <
+			J721S2_WKUP_IOPAD(0x058, PIN_OUTPUT, 0) /* (D26) WKUP_GPIO0_0.MCU_SPI1_CLK */
+			J721S2_WKUP_IOPAD(0x05c, PIN_INPUT, 0) /* (E24) WKUP_GPIO0_1.MCU_SPI1_D0 */
+			J721S2_WKUP_IOPAD(0x060, PIN_OUTPUT, 0) /* (C28) WKUP_GPIO0_2.MCU_SPI1_D1 */
+			J721S2_WKUP_IOPAD(0x064, PIN_OUTPUT_PULLUP, 7) /* (C27) WKUP_GPIO0_3 */
+
+			/* FPGA CRESETN */
+			J721S2_WKUP_IOPAD(0x084, PIN_OUTPUT, 7) /* (F25) WKUP_GPIO0_11 */
+
+			/* FPGA CDONE */
+			J721S2_WKUP_IOPAD(0x07c, PIN_INPUT_PULLUP, 7) /* (H26) WKUP_GPIO0_9 */
+		>;
+	};
+};
+
+&main_gpio2 {
+	status = "disabled";
+};
+
+&main_gpio4 {
+	status = "disabled";
+};
+
+&main_gpio6 {
+	status = "disabled";
+};
+
+&wkup_gpio1 {
+	status = "disabled";
+};
+
+&wkup_uart0 {
+	status = "reserved";
+	pinctrl-names = "default";
+	pinctrl-0 = <&wkup_uart0_pins_default>;
+};
+
+&mcu_uart0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcu_uart0_pins_default>;
+};
+
+&main_uart5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&main_uart5_pins_default>;
+};
+
+&vpu {
+	sram-size = <0>;
+};
+
+/delete-node/ &mux0;
+/delete-node/ &mux1;
+/delete-node/ &exp_som;
+
+&main_i2c0 {
+	status = "disabled";
+};
+
+&main_sdhci0 {
+	/* eMMC */
+	non-removable;
+	ti,driver-strength-ohm = <50>;
+	disable-wp;
+};
+
+&mcu_cpsw {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcu_cpsw_pins_default &mcu_mdio_pins_default>;
+
+	cpts@3d000 {
+		/* Map HW4_TS_PUSH to GENF1 */
+		ti,pps = <3 1>;
+	};
+};
+
+&davinci_mdio {
+	phy0: ethernet-phy@0 {
+		reg = <0>;
+		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
+		ti,min-output-impedance;
+	};
+};
+
+&cpsw_port1 {
+	phy-mode = "rgmii-rxid";
+	phy-handle = <&phy0>;
+};
+
+&serdes_ln_ctrl {
+	idle-states = <J721S2_SERDES0_LANE0_EDP_LANE0>, <J721S2_SERDES0_LANE1_EDP_LANE1>,
+		      <J721S2_SERDES0_LANE2_IP4_UNUSED>, <J721S2_SERDES0_LANE3_USB>;
+};
+
+&serdes_refclk {
+	clock-frequency = <100000000>;
+};
+
+/delete-node/ &torrent_phy_dp;
+&serdes0 {
+	status = "okay";
+
+	serdes0_dp_link: phy@0 {
+		reg = <0>;
+		resets = <&serdes_wiz0 1>;
+		cdns,phy-type = <PHY_TYPE_DP>;
+		cdns,num-lanes = <2>;
+		cdns,max-bit-rate = <5400>;
+		#phy-cells = <0>;
+	};
+	serdes0_usb_link: phy@3 {
+		reg = <3>;
+		cdns,num-lanes = <1>;
+		#phy-cells = <0>;
+		cdns,phy-type = <PHY_TYPE_USB3>;
+		resets = <&serdes_wiz0 4>;
+	};
+};
+
+&mcu_conf {
+	spi1_ctrl_mux: mux-controller@4060 {
+		compatible = "mmio-mux";
+		reg = <0x4060 0x4>;
+		#mux-control-cells = <1>;
+		/* SPI3 <-> SPI1 loopback mux */
+		mux-reg-masks = <0x4060 0x1>;
+		idle-states = <1>; /* Disable loopback */
+	};
+};
+
+&usb_serdes_mux {
+	idle-states = <0>; /* USB0 to SERDES lane 3 */
+};
+
+&edp_serdes_mux {
+	idle-states = <0>; /* EDP0 to SERDES lane 0/1 */
+};
+
+&usbss0 {
+	status = "okay";
+	pinctrl-0 = <&main_usbss0_pins_default>;
+	pinctrl-names = "default";
+	ti,vbus-divider;
+};
+
+&usb0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	dr_mode = "otg";
+	maximum-speed = "super-speed";
+	phys = <&serdes0_usb_link>;
+	phy-names = "cdns3,usb3-phy";
+	usb-role-switch;
+
+	port@0 {
+		reg = <0>;
+		usb0_ss_ep: endpoint {
+			remote-endpoint = <&usb_conn_ss>;
+		};
+	};
+
+	port@1 {
+		reg = <1>;
+		usb0_drd_sw: endpoint {
+			remote-endpoint = <&typec_drd_sw>;
+		};
+	};
+};
+
+&pcie1_rc {
+	status = "disabled";
+};
+
+&ospi0 {
+	status = "disabled";
+};
+
+&tscadc0 {
+	pinctrl-0 = <&mcu_adc0_pins_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	adc {
+		ti,adc-channels = <0 1 2 3 4 5 6 7>;
+	};
+};
+
+&tscadc1 {
+	pinctrl-0 = <&mcu_adc1_pins_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	adc {
+		ti,adc-channels = <0 1 2 3 4 5 6 7>;
+	};
+};
+
+/delete-node/ &dsi_edp_bridge;
+
+&dss {
+	/*
+	 * These clock assignments are chosen to enable the following outputs:
+	 *
+	 * VP0 - DisplayPort SST
+	 * VP1 - DPI0
+	 * VP2 - DSI
+	 * VP3 - DPI1
+	 */
+	status = "okay";
+	assigned-clocks = <&k3_clks 158 2>,
+			  <&k3_clks 158 5>,
+			  <&k3_clks 158 14>,
+			  <&k3_clks 158 18>;
+	assigned-clock-parents = <&k3_clks 158 3>,
+				 <&k3_clks 158 7>,
+				 <&k3_clks 158 16>,
+				 <&k3_clks 158 22>;
+};
+
+&dss_ports {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	port@0 {
+		reg = <0>;
+		dpi0_out: endpoint {
+			remote-endpoint = <&dp0_in>;
+		};
+	};
+};
+
+&mhdp {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&dp0_pins_default>;
+	cdns,no-hpd;
+	phys = <&serdes0_dp_link>;
+	phy-names = "dpphy";
+};
+
+&dp0_ports {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	port@0 {
+		reg = <0>;
+		dp0_in: endpoint {
+			remote-endpoint = <&dpi0_out>;
+		};
+	};
+
+	port@4 {
+		reg = <4>;
+		dp0_out: endpoint {
+			remote-endpoint = <&dp_conn>;
+		};
+	};
+};
+
+&ti_csi2rx0 {
+	status = "okay";
+	/* MIPI-CSI Connector */
+};
+
+&ti_csi2rx1 {
+	status = "okay";
+	/* MIPI-CSI Connector */
+};
+
+&csi0_port0 {
+	status = "okay";
+
+	csi2rx0_in0: endpoint {
+		remote-endpoint = <&csi0_vc0_ep>;
+		bus-type = <4>; /* CSI2 DPHY */
+		clock-lanes = <0>;
+		data-lanes = <1 2 3 4>;
+	};
+};
+
+&csi1_port0 {
+	status = "okay";
+
+	csi2rx1_in0: endpoint {
+		remote-endpoint = <&csi1_vc0_ep>;
+		bus-type = <4>; /* CSI2 DPHY */
+		clock-lanes = <0>;
+		data-lanes = <1 2 3 4>;
+	};
+};
+
+&dphy_rx0 {
+	status = "okay";
+};
+
+&dphy_rx1 {
+	status = "okay";
+};
+
+&dphy_tx0 {
+	status = "okay";
+};
+
+&dsi0 {
+	status = "okay";
+};
+
+#define K3_TS_OFFSET(pa, val)  (0x4+(pa)*4) (0x10000 | val)
+
+&timesync_router {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcu_cpsw_cpts>;
+
+	/* Use Time Sync Router to map GENF1 input to HW4_TS_PUSH output */
+	mcu_cpsw_cpts: mcu-cpsw-cpts {
+		pinctrl-single,pins = <
+			/* pps [mcu cpsw cpts genf1] in17 -> out25 [mcu cpsw cpts hw4_push] */
+			K3_TS_OFFSET(25, 17)
+			>;
+	};
+};
