@@ -16,7 +16,9 @@
 #include <linux/netdevice.h>
 
 #define DP83TC811_PHY_ID	0x2000a253
+#define DP83TC814_PHY_ID	0x2000a261
 #define DP83811_DEVADDR		0x1f
+#define DP83814_DEVADDR1	0x01
 
 #define MII_DP83811_SGMII_CTRL	0x09
 #define MII_DP83811_INT_STAT1	0x12
@@ -74,6 +76,13 @@
 #define DP83811_SGMII_AUTO_NEG_EN	BIT(13)
 #define DP83811_SGMII_TX_ERR_DIS	BIT(14)
 #define DP83811_SGMII_SOFT_RESET	BIT(15)
+
+#define DP83814_MMD1_PMA_CTRL_2  0x0834 	//0x1834
+#define MII_DP83811_AS_MASTER   	BIT(14)
+
+#define DP83TC814_RGMII_CLK_SHIFT_CTRL 0x0602
+#define DP83TC814_RGMII_TX_CLK_DELAY_EN		BIT(0)
+#define DP83TC814_RGMII_RX_CLK_DELAY_EN		BIT(1)
 
 static int dp83811_ack_interrupt(struct phy_device *phydev)
 {
@@ -384,6 +393,102 @@ static int dp83811_resume(struct phy_device *phydev)
 	return 0;
 }
 
+static int dp83814_config_init(struct phy_device *phydev)
+{
+	int val;
+
+	/* Restart the PHY.  */
+	int err;
+
+	err = phy_write(phydev, MII_DP83811_RESET_CTRL, DP83811_HW_RESET);
+	if (err < 0)
+		return err;
+
+	{
+		val = phy_read_mmd(phydev, DP83811_DEVADDR,
+				   DP83TC814_RGMII_CLK_SHIFT_CTRL);
+
+		val &= ~(DP83TC814_RGMII_TX_CLK_DELAY_EN |
+			 DP83TC814_RGMII_RX_CLK_DELAY_EN);
+		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+			val |= (DP83TC814_RGMII_TX_CLK_DELAY_EN |
+				DP83TC814_RGMII_RX_CLK_DELAY_EN);
+
+		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID)
+			val |= DP83TC814_RGMII_TX_CLK_DELAY_EN;
+
+		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
+			val |= DP83TC814_RGMII_RX_CLK_DELAY_EN;
+
+		phy_write_mmd(phydev, DP83811_DEVADDR, DP83TC814_RGMII_CLK_SHIFT_CTRL, val);
+	}
+
+	phydev->autoneg = AUTONEG_DISABLE;
+	phydev->speed = SPEED_100;
+	phydev->duplex = DUPLEX_FULL;
+
+	return 0;
+}
+
+static int dp83814_config_aneg(struct phy_device *phydev)
+{
+	int ret;
+	u16 ctl = 0;
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+		ctl |= MII_DP83811_AS_MASTER;
+		break;
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+		break;
+	case MASTER_SLAVE_CFG_UNKNOWN:
+	case MASTER_SLAVE_CFG_UNSUPPORTED:
+		return 0;
+	default:
+		phydev_warn(phydev, "Unsupported Master/Slave mode\n");
+		return -EOPNOTSUPP;
+	}
+
+	ret = phy_modify_mmd(phydev, DP83814_DEVADDR1, DP83814_MMD1_PMA_CTRL_2,
+			 MII_DP83811_AS_MASTER, ctl);
+	if (ret < 0)
+		return ret;
+
+	ret = genphy_soft_reset(phydev);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int dp83814_read_status(struct phy_device *phydev)
+{
+	int ret;
+
+	phydev->master_slave_get = MASTER_SLAVE_CFG_UNKNOWN;
+	phydev->master_slave_state = MASTER_SLAVE_STATE_UNKNOWN;
+
+	ret = genphy_update_link(phydev);
+	if (ret)
+		return ret;
+
+	ret = phy_read_mmd(phydev, DP83814_DEVADDR1, DP83814_MMD1_PMA_CTRL_2);
+	if (ret < 0)
+		return ret;
+	if (ret & MII_DP83811_AS_MASTER)
+	{
+		phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_FORCE;
+		phydev->master_slave_state = MASTER_SLAVE_STATE_MASTER;
+	}
+	else
+	{
+		phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_FORCE;
+		phydev->master_slave_state = MASTER_SLAVE_STATE_SLAVE;
+	}
+
+	return 0;
+}
+
 static struct phy_driver dp83811_driver[] = {
 	{
 		.phy_id = DP83TC811_PHY_ID,
@@ -400,11 +505,27 @@ static struct phy_driver dp83811_driver[] = {
 		.suspend = dp83811_suspend,
 		.resume = dp83811_resume,
 	 },
+	 {
+		.phy_id = DP83TC814_PHY_ID,
+		.phy_id_mask = 0xfffffff0,
+		.name = "TI DP83TC814",
+		.features = PHY_BASIC_T1_FEATURES,
+		/* PHY_BASIC_FEATURES */
+		.config_init = dp83814_config_init,
+		.config_aneg = dp83814_config_aneg,
+		.read_status = dp83814_read_status,
+		.soft_reset = dp83811_phy_reset,
+		.config_intr = dp83811_config_intr,
+		.handle_interrupt = dp83811_handle_interrupt,
+		.suspend = genphy_suspend,
+		.resume = genphy_resume,
+	 },
 };
 module_phy_driver(dp83811_driver);
 
 static struct mdio_device_id __maybe_unused dp83811_tbl[] = {
 	{ DP83TC811_PHY_ID, 0xfffffff0 },
+	{ DP83TC814_PHY_ID, 0xfffffff0 },
 	{ },
 };
 MODULE_DEVICE_TABLE(mdio, dp83811_tbl);
