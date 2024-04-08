@@ -13,9 +13,9 @@
 / {
 	memory@80000000 {
 		device_type = "memory";
-		/* 16 GB RAM */
+		/* 4 GB RAM */
 		reg = <0x00 0x80000000 0x00 0x80000000>,
-		      <0x08 0x80000000 0x03 0x80000000>;
+		      <0x08 0x80000000 0x00 0x80000000>;
 	};
 
 	/* Reserving memory regions still pending */
