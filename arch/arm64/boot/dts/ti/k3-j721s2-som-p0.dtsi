@@ -14,9 +14,9 @@
 	memory@80000000 {
 		device_type = "memory";
 		bootph-all;
-		/* 16 GB RAM */
+		/* 4 GB RAM */
 		reg = <0x00000000 0x80000000 0x00000000 0x80000000>,
-		      <0x00000008 0x80000000 0x00000003 0x80000000>;
+		      <0x00000008 0x80000000 0x00000000 0x80000000>;
 	};
 
 	/* Reserving memory regions still pending */
