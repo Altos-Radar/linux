@@ -498,7 +498,6 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 			WRITE_ONCE(priv->resp_queue->head,
 				(head + 1) % ARRAY_SIZE(priv->resp_queue->queue));
 			schedule_work(&priv->resp_queue->work);
-			dev_warn(&rpdev->dev, "Queued RPVB_QUERY_RESP_BASE for handling\n");
 		} else if (resp_header->subtype == RPVB_QUERY_RESP_QUEUE) {
 			struct rpvb_msg_query_resp_queue *queue = data;
 			int head = priv->resp_queue->head;
@@ -511,7 +510,6 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 			WRITE_ONCE(priv->resp_queue->head,
 				(head + 1) % ARRAY_SIZE(priv->resp_queue->queue));
 			schedule_work(&priv->resp_queue->work);
-			dev_warn(&rpdev->dev, "Queued RPVB_QUERY_RESP_QUEUE for handling\n");
 		} else {
 			dev_warn(&rpdev->dev, "Unknown query response subtype: %d\n",
 				 resp_header->subtype);
@@ -526,7 +524,6 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 			dev_warn(&rpdev->dev, "Short dequeue: %d bytes\n", len);
 			return 0;
 		}
-		dev_warn(&rpdev->dev, "Received RPVB_MSG_TYPE_DEQUEUE\n");
 		spin_lock_irqsave(&priv->job_lock, flags);
 		current_ctx = priv->current_job_ctx;
 		priv->current_job_ctx = NULL;
