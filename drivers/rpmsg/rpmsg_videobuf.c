@@ -332,6 +332,7 @@ static int rpvb_open(struct file *file)
 		goto unlock;
 	}
 
+	mutex_init(&ctx->lock);
 	v4l2_fh_init(&ctx->fh, video_devdata(file));
 	file->private_data = &ctx->fh;
 	ctx->priv = priv;
