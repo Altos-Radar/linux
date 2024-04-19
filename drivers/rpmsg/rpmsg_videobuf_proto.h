@@ -29,7 +29,7 @@ struct rpvb_msg_query_resp_header {
 
 struct rpvb_msg_query_resp_base {
 	uint16_t type;
-        uint16_t sub_type;
+	uint16_t sub_type;
 	char name[32];
 	uint16_t tx_queues;
 	uint16_t rx_queues;
@@ -56,5 +56,6 @@ struct rpvb_msg_queue {
 
 struct rpvb_msg_dequeue {
 	uint16_t type;
-	uint16_t flags;
+	uint16_t queue_index;
+	uint32_t size;
 };

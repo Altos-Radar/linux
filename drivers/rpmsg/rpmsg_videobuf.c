@@ -46,6 +46,7 @@ struct rpvb_priv {
 	struct v4l2_m2m_dev *m2m_dev;
 	spinlock_t job_lock;
 	struct v4l2_m2m_ctx *current_job_ctx;
+	u64 job_queues_done;
 
 	struct resp_queue *resp_queue;
 	char name[32];
@@ -195,6 +196,7 @@ static void rpvb_device_run(void *p)
 
 	spin_lock(&priv->job_lock);
 	priv->current_job_ctx = ctx->fh.m2m_ctx;
+	priv->job_queues_done = (1 << priv->tx_queues) - 1;
 	spin_unlock(&priv->job_lock);
 
 	msg->type = RPVB_MSG_TYPE_QUEUE;
@@ -521,17 +523,26 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 		unsigned long flags;
 		struct rpvb_msg_dequeue *dequeue = data;
 		struct v4l2_m2m_ctx *current_ctx;
+		struct vb2_v4l2_buffer *dst_buf;
+		u64 queue_mask = (1 << (priv->tx_queues + priv->rx_queues)) - 1;
+		bool job_done = false;
 		if (len != sizeof(*dequeue)) {
 			dev_warn(&rpdev->dev, "Short dequeue: %d bytes\n", len);
 			return 0;
 		}
 		spin_lock_irqsave(&priv->job_lock, flags);
 		current_ctx = priv->current_job_ctx;
-		priv->current_job_ctx = NULL;
+		priv->job_queues_done |= (1 << dequeue->queue_index) & queue_mask;
+		job_done = priv->job_queues_done == queue_mask;
+		if (job_done)
+			priv->current_job_ctx = NULL;
 		spin_unlock_irqrestore(&priv->job_lock, flags);
-		if (current_ctx)
-			v4l2_m2m_buf_done_and_job_finish(priv->m2m_dev, current_ctx, VB2_BUF_STATE_DONE);
-		else
+		if (current_ctx) {
+			dst_buf = v4l2_m2m_next_dst_buf(current_ctx);
+			vb2_set_plane_payload(&dst_buf->vb2_buf, dequeue->queue_index - priv->tx_queues, dequeue->size);
+			if (job_done)
+				v4l2_m2m_buf_done_and_job_finish(priv->m2m_dev, current_ctx, VB2_BUF_STATE_DONE);
+		} else if (job_done)
 			dev_warn(&rpdev->dev, "No context avaiable to dequeue with\n");
 		return 0;
 	}
