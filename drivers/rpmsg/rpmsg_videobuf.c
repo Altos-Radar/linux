@@ -11,6 +11,7 @@
 #include <linux/videodev2.h>
 #include <linux/workqueue.h>
 #include <linux/circ_buf.h>
+#include <media/v4l2-ctrls.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
@@ -24,6 +25,7 @@ union query_resp {
 	struct rpvb_msg_query_resp_header header;
 	struct rpvb_msg_query_resp_base base;
 	struct rpvb_msg_query_resp_queue queue;
+	struct rpvb_msg_query_resp_control ctrl;
 };
 
 struct resp_queue {
@@ -41,6 +43,7 @@ struct rpvb_queue_info {
 
 struct rpvb_priv {
 	struct rpmsg_endpoint *ept;
+	struct v4l2_ctrl_handler ctrl_handler;
 	struct v4l2_device v4l2_dev;
 	struct video_device vdev;
 	struct v4l2_m2m_dev *m2m_dev;
@@ -52,6 +55,8 @@ struct rpvb_priv {
 	char name[32];
 	u16 tx_queues;
 	u16 rx_queues;
+	u32 controls;
+	u32 controls_registered;
 	u32 width;
 	u32 height;
 	u32 fourcc;
@@ -369,6 +374,69 @@ static const struct v4l2_file_operations rpvb_fops = {
 	.poll = v4l2_m2m_fop_poll,
 };
 
+static int rpvb_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct rpvb_priv *priv = ctrl->priv;
+	int ret;
+	switch (ctrl->type) {
+	case V4L2_CTRL_TYPE_INTEGER:
+	case V4L2_CTRL_TYPE_BOOLEAN: {
+		struct rpvb_msg_set_control_int32 msg = {
+			.type = RPVB_MSG_TYPE_SET_CONTROL,
+			.ctrl_type = ctrl->type,
+			.ctrl_index = ctrl->id - V4L2_CID_USER_BASE,
+			.val = ctrl->val,
+		};
+		ret = rpmsg_send(priv->ept, &msg, sizeof(msg));
+		break;
+	}
+	case V4L2_CTRL_TYPE_INTEGER64: {
+		struct rpvb_msg_set_control_int64 msg = {
+                        .type = RPVB_MSG_TYPE_SET_CONTROL,
+                        .ctrl_type = ctrl->type,
+                        .ctrl_index = ctrl->id - V4L2_CID_USER_BASE,
+                        .val = *ctrl->p_new.p_s64,
+                };
+                ret = rpmsg_send(priv->ept, &msg, sizeof(msg));
+		break;
+	}
+	case V4L2_CTRL_TYPE_U8:
+	case V4L2_CTRL_TYPE_U16:
+	case V4L2_CTRL_TYPE_U32: {
+		struct rpvb_msg_set_control_compound msg = {
+			.header = {
+				.type = RPVB_MSG_TYPE_SET_CONTROL,
+				.ctrl_type = ctrl->type,
+				.ctrl_index = ctrl->id - V4L2_CID_USER_BASE,
+			},
+		};
+		int chunk_size = sizeof(msg.data) / ctrl->elem_size;
+		for (int i = 0; i < ctrl->elems; i += chunk_size) {
+			int chunk_len = min((int)ctrl->elems - i, chunk_size);
+			int chunk_start_idx = i * ctrl->elem_size;
+			int chunk_len_bytes = chunk_len * ctrl->elem_size;
+			memcpy(&msg.data, &ctrl->p_new.p_u8[chunk_start_idx], chunk_len_bytes);
+			msg.header.start_index = i;
+			msg.header.elems = chunk_len;
+			ret = rpmsg_send(priv->ept, &msg, sizeof(msg.header) + chunk_len_bytes);
+			if (ret)
+				break;
+		}
+		break;
+	}
+	default:
+		dev_warn(priv->v4l2_dev.dev, "Unsupported control type: %d\n", ctrl->type);
+		return -EINVAL;
+	}
+	if (ret)
+		dev_warn(priv->v4l2_dev.dev, "Failed to send set control message: %d\n", ret);
+	return ret;
+}
+
+static const struct v4l2_ctrl_ops rpvb_ctrl_ops = {
+	.s_ctrl = rpvb_s_ctrl,
+};
+
 static void rpvb_device_release(struct video_device *vdev)
 {
 }
@@ -394,6 +462,10 @@ static void rpvb_query_resp_work(struct work_struct *work)
 				dev_warn(priv->v4l2_dev.dev, "Must have at least one tx and rx queue\n");
 				continue;
 			}
+			if (priv->tx_queue_info) {
+				dev_warn(priv->v4l2_dev.dev, "Already received base response\n");
+				continue;
+			}
 			priv->tx_queue_info = kzalloc(
 				sizeof(priv->tx_queue_info[0]) * base->tx_queues, GFP_KERNEL);
 			if (!priv->tx_queue_info) {
@@ -411,9 +483,11 @@ static void rpvb_query_resp_work(struct work_struct *work)
 			memcpy(priv->name, base->name, sizeof(priv->name));
 			priv->rx_queues = base->rx_queues;
 			priv->tx_queues = base->tx_queues;
+			priv->controls = base->controls;
 			priv->width = base->width;
 			priv->height = base->height;
 			priv->fourcc = base->fourcc;
+			v4l2_ctrl_handler_init(&priv->ctrl_handler, base->controls);
 		} else if (resp_header->subtype == RPVB_QUERY_RESP_QUEUE) {
 			struct rpvb_msg_query_resp_queue *queue = &entry->queue;
 			struct rpvb_queue_info *info = NULL;
@@ -436,6 +510,47 @@ static void rpvb_query_resp_work(struct work_struct *work)
 			}
 			info->stride = queue->stride;
 			info->size = queue->size;
+		} else if (resp_header->subtype == RPVB_QUERY_RESP_CONTROL) {
+			struct rpvb_msg_query_resp_control *ctrl_info = &entry->ctrl;
+			struct v4l2_ctrl_config config = {
+				.ops = &rpvb_ctrl_ops,
+				.id = V4L2_CID_USER_BASE + ctrl_info->index,
+				.type = ctrl_info->ctrl_type,
+				.min = ctrl_info->minimum,
+				.max = ctrl_info->maximum,
+				.step = ctrl_info->step,
+				.def = ctrl_info->default_value,
+				.elem_size = ctrl_info->elem_size,
+			};
+			struct v4l2_ctrl *ctrl;
+			memcpy(config.dims, ctrl_info->dims, sizeof(config.dims));
+			if (priv->controls_registered >= priv->controls) {
+				dev_warn(priv->v4l2_dev.dev, "More controls than registered\n");
+				continue;
+			}
+			config.name = kstrndup(ctrl_info->name, sizeof(ctrl_info->name), GFP_KERNEL);
+			if (!config.name) {
+				dev_warn(priv->v4l2_dev.dev, "Could not allocate name\n");
+				continue;
+			}
+			switch (ctrl_info->ctrl_type) {
+			case RPVB_CTRL_TYPE_INT:
+			case RPVB_CTRL_TYPE_BOOLEAN:
+			case RPVB_CTRL_TYPE_INT64:
+			case RPVB_CTRL_COMPOUND_U8:
+			case RPVB_CTRL_COMPOUND_U16:
+			case RPVB_CTRL_COMPOUND_U32:
+				break;
+			default:
+				dev_warn(priv->v4l2_dev.dev, "Unknown control type: 0x%x\n",
+					ctrl_info->ctrl_type);
+				break;
+			}
+			ctrl = v4l2_ctrl_new_custom(&priv->ctrl_handler, &config, priv);
+			if (!ctrl)
+				dev_warn(priv->v4l2_dev.dev, "Failed to register control %d\n",
+					ctrl_info->index);
+			priv->controls_registered++;
 		}
 	}
 	WRITE_ONCE(queue->tail, tail);
@@ -448,9 +563,21 @@ static void rpvb_query_resp_work(struct work_struct *work)
 	for (u16 i = 0; i < priv->rx_queues; ++i) {
 		ready &= priv->rx_queue_info[i].size != 0;
 	}
+	dev_warn(priv->v4l2_dev.dev, "%d == %d?\n", priv->controls_registered, priv->controls);
+	ready &= priv->controls_registered == priv->controls;
 	if (ready) {
 		struct video_device *vdev = &priv->vdev;
 		int ret;
+		if (priv->ctrl_handler.error) {
+			dev_err(priv->v4l2_dev.dev, "Failed to register controls: %d\n",
+				priv->ctrl_handler.error);
+			v4l2_ctrl_handler_free(&priv->ctrl_handler);
+			kfree(priv->tx_queue_info);
+			kfree(priv->rx_queue_info);
+			priv->tx_queue_info = NULL;
+			priv->rx_queue_info = NULL;
+			return;
+		}
 		vdev->lock = &priv->lock;
 		vdev->vfl_dir = VFL_DIR_M2M;
 		vdev->release = rpvb_device_release;
@@ -461,6 +588,7 @@ static void rpvb_query_resp_work(struct work_struct *work)
 			V4L2_CAP_VIDEO_OUTPUT_MPLANE |
 			V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_STREAMING;
 		vdev->v4l2_dev = &priv->v4l2_dev;
+		vdev->ctrl_handler = &priv->ctrl_handler;
 		video_set_drvdata(vdev, priv);
 		ret = video_register_device(vdev, VFL_TYPE_VIDEO, -1);
 		if (ret)
@@ -481,6 +609,7 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 	// video device not yet registered
 	if (priv->vdev.fops == NULL) {
 		struct rpvb_msg_query_resp_header *resp_header = data;
+		int head = priv->resp_queue->head;
 		if (header->type != RPVB_MSG_TYPE_QUERY_RESP) {
 			dev_warn(&rpdev->dev, "Expected query resp, got: %d\n", header->type);
 			return 0;
@@ -491,32 +620,34 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 		}
 		if (resp_header->subtype == RPVB_QUERY_RESP_BASE) {
 			struct rpvb_msg_query_resp_base *base = data;
-			int head = priv->resp_queue->head;
 			if (len != sizeof(*base)) {
 				dev_warn(&rpdev->dev, "Wrong query base resp len: %d bytes\n", len);
 				return 0;
 			}
 			memcpy(&priv->resp_queue->queue[head].base, base, sizeof(*base));
-			wmb();
-			WRITE_ONCE(priv->resp_queue->head,
-				(head + 1) % ARRAY_SIZE(priv->resp_queue->queue));
-			schedule_work(&priv->resp_queue->work);
 		} else if (resp_header->subtype == RPVB_QUERY_RESP_QUEUE) {
 			struct rpvb_msg_query_resp_queue *queue = data;
-			int head = priv->resp_queue->head;
 			if (len != sizeof(*queue)) {
 				dev_warn(&rpdev->dev, "Wrong queue resp len: %d bytes\n", len);
 				return 0;
 			}
 			memcpy(&priv->resp_queue->queue[head].queue, queue, sizeof(*queue));
-			wmb();
-			WRITE_ONCE(priv->resp_queue->head,
-				(head + 1) % ARRAY_SIZE(priv->resp_queue->queue));
-			schedule_work(&priv->resp_queue->work);
+		} else if (resp_header->subtype == RPVB_QUERY_RESP_CONTROL) {
+			struct rpvb_msg_query_resp_control *ctrl = data;
+			if (len != sizeof(*ctrl)) {
+				dev_warn(&rpdev->dev, "Wrong queue resp len: %d bytes\n", len);
+				return 0;
+			}
+			memcpy(&priv->resp_queue->queue[head].ctrl, ctrl, sizeof(*ctrl));
 		} else {
 			dev_warn(&rpdev->dev, "Unknown query response subtype: %d\n",
 				 resp_header->subtype);
+			return 0;
 		}
+		wmb();
+		WRITE_ONCE(priv->resp_queue->head,
+			(head + 1) % ARRAY_SIZE(priv->resp_queue->queue));
+		schedule_work(&priv->resp_queue->work);
 		return 0;
 	}
 	if (header->type == RPVB_MSG_TYPE_DEQUEUE) {
