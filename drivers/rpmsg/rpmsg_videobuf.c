@@ -250,8 +250,8 @@ static int rpvb_g_fmt(struct rpvb_priv *priv, struct v4l2_format *f, uint16_t qu
 	pix->colorspace = V4L2_COLORSPACE_RAW;
 	pix->num_planes = min(queue_len, (uint16_t)VIDEO_MAX_PLANES);
 	for (uint8_t i = 0; i < pix->num_planes; ++i) {
-		pix->plane_fmt[i].sizeimage = priv->rx_queue_info[i].size;
-		pix->plane_fmt[i].bytesperline = priv->rx_queue_info[i].stride;
+		pix->plane_fmt[i].sizeimage = info[i].size;
+		pix->plane_fmt[i].bytesperline = info[i].stride;
 		memset(pix->plane_fmt[i].reserved, 0, sizeof(pix->plane_fmt[i].reserved));
 	}
 	pix->flags = 0;
@@ -563,7 +563,6 @@ static void rpvb_query_resp_work(struct work_struct *work)
 	for (u16 i = 0; i < priv->rx_queues; ++i) {
 		ready &= priv->rx_queue_info[i].size != 0;
 	}
-	dev_warn(priv->v4l2_dev.dev, "%d == %d?\n", priv->controls_registered, priv->controls);
 	ready &= priv->controls_registered == priv->controls;
 	if (ready) {
 		struct video_device *vdev = &priv->vdev;
