@@ -712,6 +712,7 @@ static int rpvb_probe(struct rpmsg_device *rpdev)
 
 	if (!rpdev->dev.dma_mask)
 		rpdev->dev.dma_mask = &rpdev->dev.coherent_dma_mask;
+	rpdev->dev.dma_coherent = true;
 	ret = dma_set_coherent_mask(&rpdev->dev, DMA_BIT_MASK(48));
 	if (ret) {
 		dev_warn(&rpdev->dev, "Failed to set DMA coherent mask: %d\n", ret);
