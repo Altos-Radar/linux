@@ -960,20 +960,16 @@ static int ti_csi2rx_start_streaming(struct vb2_queue *vq, unsigned int count)
 	int ret = 0, i;
 	struct v4l2_subdev_state *state;
 
-	ret = pm_runtime_resume_and_get(csi->dev);
-	if (ret)
-		goto err;
-
 	spin_lock_irqsave(&dma->lock, flags);
 	if (list_empty(&dma->queue))
 		ret = -EIO;
 	spin_unlock_irqrestore(&dma->lock, flags);
 	if (ret)
-		goto err_pm;
+		goto err;
 
 	ret = video_device_pipeline_start(&ctx->vdev, &csi->pipe);
 	if (ret)
-		goto err_pm;
+		goto err;
 
 	remote_pad = media_entity_remote_source_pad_unique(ctx->pad.entity);
 	if (!remote_pad) {
@@ -1043,8 +1039,6 @@ err_dma:
 	writel(0, csi->shim + SHIM_DMACNTX(ctx->idx));
 err_pipeline:
 	video_device_pipeline_stop(&ctx->vdev);
-err_pm:
-	pm_runtime_put(csi->dev);
 err:
 	ti_csi2rx_cleanup_buffers(ctx, VB2_BUF_STATE_QUEUED);
 	return ret;
@@ -1071,7 +1065,6 @@ static void ti_csi2rx_stop_streaming(struct vb2_queue *vq)
 	writel(0, csi->shim + SHIM_DMACNTX(ctx->idx));
 
 	ti_csi2rx_cleanup_buffers(ctx, VB2_BUF_STATE_ERROR);
-	pm_runtime_put(csi->dev);
 }
 
 static const struct vb2_ops csi_vb2_qops = {
@@ -1302,8 +1295,7 @@ static void ti_csi2rx_cleanup_vb2q(struct ti_csi2rx_ctx *ctx)
 
 static void ti_csi2rx_cleanup_ctx(struct ti_csi2rx_ctx *ctx)
 {
-	if (!pm_runtime_status_suspended(ctx->csi->dev))
-		ti_csi2rx_cleanup_dma(ctx);
+	ti_csi2rx_cleanup_dma(ctx);
 
 	ti_csi2rx_cleanup_vb2q(ctx);
 
@@ -1486,10 +1478,6 @@ static int ti_csi2rx_suspend(struct device *dev)
 	unsigned long flags = 0;
 	int i, ret = 0;
 
-	/* If device was not in use we can simply suspend */
-	if (pm_runtime_status_suspended(dev))
-		return 0;
-
 	/*
 	 * If device is running, assert the pixel reset to cleanly stop any
 	 * on-going streams before we suspend.
@@ -1539,10 +1527,6 @@ static int ti_csi2rx_resume(struct device *dev)
 	unsigned long flags = 0;
 	unsigned int reg;
 	int i, ret = 0;
-
-	/* If device was not in use, we can simply wakeup */
-	if (pm_runtime_status_suspended(dev))
-		return 0;
 
 	/* If device was in use before, restore all the running streams */
 	reg = SHIM_CNTL_PIX_RST;
@@ -1678,10 +1662,6 @@ static int ti_csi2rx_probe(struct platform_device *pdev)
 		goto cleanup_subdev;
 	}
 
-	pm_runtime_set_active(csi->dev);
-	pm_runtime_enable(csi->dev);
-	pm_runtime_idle(csi->dev);
-
 	return 0;
 
 cleanup_subdev:
@@ -1719,9 +1699,6 @@ static int ti_csi2rx_remove(struct platform_device *pdev)
 	mutex_destroy(&csi->mutex);
 	dma_free_coherent(csi->dev, csi->drain.len, csi->drain.vaddr,
 			  csi->drain.paddr);
-
-	pm_runtime_disable(&pdev->dev);
-	pm_runtime_set_suspended(&pdev->dev);
 
 	return 0;
 }
