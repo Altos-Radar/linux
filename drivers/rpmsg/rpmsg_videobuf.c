@@ -214,7 +214,6 @@ static void rpvb_device_run(void *p)
 		ret = rpmsg_send(priv->ept, msg, sizeof(*msg) + sizeof(uint64_t));
 		if (ret)
 			dev_warn(priv->v4l2_dev.dev, "Could not queue rx. index %d\n", i);
-		vb2_set_plane_payload(&dst_buf->vb2_buf, i, priv->rx_queue_info[i].size);
 	}
 	for (int i = 0; i < priv->tx_queues; ++i) {
 		int ret;
@@ -668,8 +667,12 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 			priv->current_job_ctx = NULL;
 		spin_unlock_irqrestore(&priv->job_lock, flags);
 		if (current_ctx) {
+			uint32_t plane_idx = dequeue->queue_index - priv->tx_queues;
 			dst_buf = v4l2_m2m_next_dst_buf(current_ctx);
-			vb2_set_plane_payload(&dst_buf->vb2_buf, dequeue->queue_index - priv->tx_queues, dequeue->size);
+			if (plane_idx >= dst_buf->vb2_buf.num_planes)
+				dev_warn(&rpdev->dev, "Invalid queue index? %u (%u)\n",
+					dequeue->queue_index, plane_idx);
+			vb2_set_plane_payload(&dst_buf->vb2_buf, plane_idx, dequeue->size);
 			if (job_done)
 				v4l2_m2m_buf_done_and_job_finish(priv->m2m_dev, current_ctx, VB2_BUF_STATE_DONE);
 		} else if (job_done)
