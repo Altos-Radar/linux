@@ -39,6 +39,7 @@ struct dma_heap_attachment {
 	struct device *dev;
 	struct sg_table *table;
 	struct list_head list;
+	bool mapped;
 };
 
 static int dma_heap_attach(struct dma_buf *dmabuf,
@@ -66,6 +67,7 @@ static int dma_heap_attach(struct dma_buf *dmabuf,
 	a->table = table;
 	a->dev = attachment->dev;
 	INIT_LIST_HEAD(&a->list);
+	a->mapped = false;
 
 	attachment->priv = a;
 
@@ -104,6 +106,7 @@ static struct sg_table *dma_heap_map_dma_buf(struct dma_buf_attachment *attachme
 			      direction, attrs))
 		return ERR_PTR(-ENOMEM);
 
+	a->mapped = true;
 	return table;
 }
 
@@ -112,10 +115,12 @@ static void dma_heap_unmap_dma_buf(struct dma_buf_attachment *attachment,
 				   enum dma_data_direction direction)
 {
 	struct carveout_dma_heap_buffer *buffer = attachment->dmabuf->priv;
+	struct dma_heap_attachment *a = attachment->priv;
 	unsigned long attrs = buffer->cached ? 0 : DMA_ATTR_SKIP_CPU_SYNC;
 
 	dma_unmap_sg_attrs(attachment->dev, table->sgl, table->nents,
 			   direction, attrs);
+	a->mapped = false;
 }
 
 static void dma_heap_dma_buf_release(struct dma_buf *dmabuf)
@@ -147,6 +152,8 @@ static int dma_heap_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 
 	mutex_lock(&buffer->attachments_lock);
 	list_for_each_entry(a, &buffer->attachments, list) {
+		if (!a->mapped)
+			continue;
 		dma_sync_sg_for_cpu(a->dev, a->table->sgl, a->table->nents,
 				    direction);
 	}
@@ -171,6 +178,8 @@ static int dma_heap_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 
 	mutex_lock(&buffer->attachments_lock);
 	list_for_each_entry(a, &buffer->attachments, list) {
+		if (!a->mapped)
+			continue;
 		dma_sync_sg_for_device(a->dev, a->table->sgl, a->table->nents,
 				       direction);
 	}
