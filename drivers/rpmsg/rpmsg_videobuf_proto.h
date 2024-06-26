@@ -11,6 +11,7 @@ enum rpvb_msg_type {
 	RPVB_MSG_TYPE_QUEUE = 2,
 	RPVB_MSG_TYPE_DEQUEUE = 3,
 	RPVB_MSG_TYPE_SET_CONTROL = 4,
+	RPVB_MSG_TYPE_DEQUEUE_ERROR = 5,
 };
 
 enum rpvb_query_resp_subtype {

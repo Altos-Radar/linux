@@ -656,7 +656,7 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 		u64 queue_mask = (1 << (priv->tx_queues + priv->rx_queues)) - 1;
 		bool job_done = false;
 		if (len != sizeof(*dequeue)) {
-			dev_warn(&rpdev->dev, "Short dequeue: %d bytes\n", len);
+			dev_warn(&rpdev->dev, "Wrong dequeue len: %d bytes\n", len);
 			return 0;
 		}
 		spin_lock_irqsave(&priv->job_lock, flags);
@@ -677,6 +677,18 @@ static int rpvb_cb(struct rpmsg_device *rpdev,
 				v4l2_m2m_buf_done_and_job_finish(priv->m2m_dev, current_ctx, VB2_BUF_STATE_DONE);
 		} else if (job_done)
 			dev_warn(&rpdev->dev, "No context avaiable to dequeue with\n");
+		return 0;
+	} else if (header->type == RPVB_MSG_TYPE_DEQUEUE_ERROR) {
+		unsigned long flags;
+		struct v4l2_m2m_ctx *current_ctx;
+		spin_lock_irqsave(&priv->job_lock, flags);
+		current_ctx = priv->current_job_ctx;
+		priv->current_job_ctx = NULL;
+		spin_unlock_irqrestore(&priv->job_lock, flags);
+		if (current_ctx) {
+			v4l2_m2m_buf_done_and_job_finish(priv->m2m_dev, current_ctx, VB2_BUF_STATE_ERROR);
+		} else
+			dev_warn(&rpdev->dev, "Error without current job\n");
 		return 0;
 	}
 
