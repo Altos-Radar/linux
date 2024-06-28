@@ -38,6 +38,13 @@
 #define CSI2RX_DPHY_CL_EN			BIT(4)
 #define CSI2RX_DPHY_DL_EN(i)			BIT(i)
 
+#define CSI2RX_INFO_IRQS			0x20
+#define CSI2RX_INFO_IRQS_MASK			0x24
+
+#define CSI2RX_ERROR_IRQS			0x28
+#define CSI2RX_ERROR_IRQS_MASK			0x2C
+#define CSI2RX_ERROR_DEBUG			0x74
+
 #define CSI2RX_STREAM_BASE(n)		(((n) + 1) * 0x100)
 
 #define CSI2RX_STREAM_CTRL_REG(n)		(CSI2RX_STREAM_BASE(n) + 0x000)
@@ -89,6 +96,8 @@ struct csi2rx_priv {
 	struct reset_control		*p_rst;
 	struct reset_control		*pixel_rst[CSI2RX_STREAMS_MAX];
 	struct phy			*dphy;
+	unsigned int			err_irq;
+	unsigned int			irq;
 
 	u32				vc_select[CSI2RX_STREAMS_MAX];
 	u8				lanes[CSI2RX_LANES_MAX];
@@ -336,6 +345,9 @@ static int csi2rx_start(struct csi2rx_priv *csi2rx)
 
 	clk_disable_unprepare(csi2rx->p_clk);
 
+	writel(0x00011EF1, csi2rx->base + CSI2RX_ERROR_IRQS_MASK);
+	writel(0x000003F0, csi2rx->base + CSI2RX_INFO_IRQS_MASK);
+
 	return 0;
 
 err_disable_pixclk:
@@ -359,6 +371,9 @@ static void csi2rx_stop(struct csi2rx_priv *csi2rx)
 	unsigned int i;
 	u32 val;
 	int ret;
+
+	writel(0, csi2rx->base + CSI2RX_ERROR_IRQS_MASK);
+	writel(0, csi2rx->base + CSI2RX_INFO_IRQS_MASK);
 
 	clk_prepare_enable(csi2rx->p_clk);
 	reset_control_assert(csi2rx->sys_rst);
@@ -947,6 +962,25 @@ static int csi2rx_resume(struct device *dev)
 	return 0;
 }
 
+static irqreturn_t csi2rx_err_irq_handler(int irq, void *p)
+{
+	struct csi2rx_priv *csi2rx = p;
+	const u32 err_irq = readl(csi2rx->base + CSI2RX_ERROR_IRQS);
+	const u32 err_debug = readl(csi2rx->base + CSI2RX_ERROR_DEBUG);
+	writel(err_irq, csi2rx->base + CSI2RX_ERROR_IRQS);
+	dev_err(csi2rx->dev, "Error IRQ: 0x%08x, Debug: 0x%08x\n", err_irq, err_debug);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t csi2rx_irq_handler(int irq, void *p)
+{
+	struct csi2rx_priv *csi2rx = p;
+	const u32 info_irq = readl(csi2rx->base + CSI2RX_INFO_IRQS);
+	writel(info_irq, csi2rx->base + CSI2RX_INFO_IRQS);
+	dev_err(csi2rx->dev, "Info IRQ: 0x%08x\n", info_irq);
+	return IRQ_HANDLED;
+}
+
 static int csi2rx_probe(struct platform_device *pdev)
 {
 	struct csi2rx_priv *csi2rx;
@@ -998,6 +1032,32 @@ static int csi2rx_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_free_state;
 
+	ret = platform_get_irq_byname(pdev, "err_irq");
+	if (ret < 0) {
+		dev_warn(&pdev->dev, "platform_get_irq_byname failed");
+		goto err_free_subdev;
+	}
+	csi2rx->err_irq = ret;
+
+	ret = platform_get_irq_byname(pdev, "irq");
+	if (ret < 0) {
+		dev_warn(&pdev->dev, "platform_get_irq_byname failed");
+		goto err_free_subdev;
+	}
+	csi2rx->irq = ret;
+
+	ret = request_irq(csi2rx->err_irq, csi2rx_err_irq_handler, 0, "cdns-csi2rx", csi2rx);
+	if (ret) {
+		dev_warn(&pdev->dev, "request_irq failed");
+		goto err_free_subdev;
+	}
+
+	ret = request_irq(csi2rx->irq, csi2rx_irq_handler, 0, "cdns-csi2rx", csi2rx);
+	if (ret) {
+		dev_warn(&pdev->dev, "request_irq failed");
+		goto err_free_subdev;
+	}
+
 	dev_info(&pdev->dev,
 		 "Probed CSI2RX with %u/%u lanes, %u streams, %s D-PHY\n",
 		 csi2rx->num_lanes, csi2rx->max_lanes, csi2rx->max_streams,
@@ -1006,6 +1066,8 @@ static int csi2rx_probe(struct platform_device *pdev)
 
 	return 0;
 
+err_free_subdev:
+	v4l2_async_unregister_subdev(&csi2rx->subdev);
 err_free_state:
 	v4l2_subdev_cleanup(&csi2rx->subdev);
 	pm_runtime_disable(csi2rx->dev);
@@ -1022,6 +1084,8 @@ static void csi2rx_remove(struct platform_device *pdev)
 {
 	struct csi2rx_priv *csi2rx = platform_get_drvdata(pdev);
 
+	free_irq(csi2rx->err_irq, csi2rx);
+	free_irq(csi2rx->irq, csi2rx);
 	v4l2_async_nf_unregister(&csi2rx->notifier);
 	v4l2_async_nf_cleanup(&csi2rx->notifier);
 	v4l2_async_unregister_subdev(&csi2rx->subdev);
