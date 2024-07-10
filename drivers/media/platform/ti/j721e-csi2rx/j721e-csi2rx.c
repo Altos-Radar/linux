@@ -757,8 +757,6 @@ static void ti_csi2rx_dma_callback(void *param)
 	vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 	list_del(&buf->list);
 
-	ti_csi2rx_dma_submit_pending(ctx);
-
 	if (list_empty(&dma->submitted))
 		dma->state = TI_CSI2RX_DMA_IDLE;
 
@@ -904,6 +902,8 @@ static void ti_csi2rx_buffer_queue(struct vb2_buffer *vb)
 		dma->state = TI_CSI2RX_DMA_ACTIVE;
 	} else {
 		list_add_tail(&buf->list, &dma->queue);
+		if (dma->state == TI_CSI2RX_DMA_ACTIVE)
+			ti_csi2rx_dma_submit_pending(ctx);
 	}
 	spin_unlock_irqrestore(&dma->lock, flags);
 
