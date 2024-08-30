@@ -243,6 +243,17 @@
 	};
 };
 
+&transceiver0 {
+	max-bitrate = <8000000>;
+};
+
+&mcu_mcan0 {
+	status = "okay";
+	pinctrl-0 = <&mcu_mcan0_pins_default>;
+	pinctrl-names = "default";
+	phys = <&transceiver0>;
+};
+
 &main_mcan16 {
 	status = "disabled";
 };
