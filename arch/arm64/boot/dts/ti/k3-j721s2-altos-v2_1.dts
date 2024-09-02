@@ -261,7 +261,7 @@
 &main_pmx0 {
 	main_uart5_pins_default: main-uart5-pins-default {
 		pinctrl-single,pins = <
-			J721S2_IOPAD(0x008, PIN_INPUT, 11) /* (AC24) MCAN12_RX.UART5_RXD */
+			J721S2_IOPAD(0x008, PIN_INPUT_PULLDOWN, 11) /* (AC24) MCAN12_RX.UART5_RXD */
 			J721S2_IOPAD(0x004, PIN_OUTPUT, 11) /* (W25) MCAN12_TX.UART5_TXD */
 		>;
 	};
