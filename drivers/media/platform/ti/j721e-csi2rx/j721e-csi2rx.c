@@ -975,14 +975,14 @@ static int ti_csi2rx_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	ret = pm_runtime_resume_and_get(csi->dev);
 	if (ret)
-		return ret;
+		goto err_no_pm;
 
 	spin_lock_irqsave(&dma->lock, flags);
 	if (list_empty(&dma->queue))
 		ret = -EIO;
 	spin_unlock_irqrestore(&dma->lock, flags);
 	if (ret)
-		return ret;
+		goto err;
 
 	ret = video_device_pipeline_start(&ctx->vdev, &csi->pipe);
 	if (ret)
@@ -1059,8 +1059,9 @@ err_dma:
 	writel(0, csi->shim + SHIM_CNTL);
 	writel(0, csi->shim + SHIM_DMACNTX(ctx->idx));
 err:
-	ti_csi2rx_cleanup_buffers(ctx, VB2_BUF_STATE_QUEUED);
 	pm_runtime_put(csi->dev);
+err_no_pm:
+	ti_csi2rx_cleanup_buffers(ctx, VB2_BUF_STATE_QUEUED);
 
 	return ret;
 }
