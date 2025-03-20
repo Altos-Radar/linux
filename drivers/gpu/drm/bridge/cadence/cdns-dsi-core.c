@@ -477,10 +477,10 @@ static int cdns_dsi_mode2cfg(struct cdns_dsi *dsi,
 	bool sync_pulse;
 	int bpp;
 
-	dpi_hsa = mode->crtc_hsync_end - mode->crtc_hsync_start;
-	dpi_hbp = mode->crtc_htotal - mode->crtc_hsync_end;
-	dpi_hfp =  mode->crtc_hsync_start - mode->crtc_hdisplay;
-	dpi_hact = mode->crtc_hdisplay;
+	dpi_hsa = mode->hsync_end - mode->hsync_start;
+	dpi_hbp = mode->htotal - mode->hsync_end;
+	dpi_hfp =  mode->hsync_start - mode->hdisplay;
+	dpi_hact = mode->hdisplay;
 
 	memset(dsi_cfg, 0, sizeof(*dsi_cfg));
 
@@ -541,11 +541,11 @@ static int cdns_dsi_adjust_phy_config(struct cdns_dsi *dsi,
 	if (dsi_htotal % lanes)
 		adj_dsi_htotal += lanes - (dsi_htotal % lanes);
 
-	dpi_hz = mode->crtc_clock * 1000;
+	dpi_hz = mode->clock * 1000;
 	dlane_bps = (unsigned long long)dpi_hz * adj_dsi_htotal;
 
 	/* data rate in bytes/sec is not an integer, refuse the mode. */
-	dpi_htotal = mode->crtc_htotal;
+	dpi_htotal = mode->htotal;
 	if (do_div(dlane_bps, lanes * dpi_htotal))
 		return -EINVAL;
 
@@ -573,7 +573,7 @@ static int cdns_dsi_check_conf(struct cdns_dsi *dsi,
 	if (ret)
 		return ret;
 
-	ret = phy_mipi_dphy_get_default_config(mode->crtc_clock * 1000,
+	ret = phy_mipi_dphy_get_default_config(mode->clock * 1000,
 					       mipi_dsi_pixel_format_to_bpp(output->dev->format),
 					       nlanes, phy_cfg);
 	if (ret)
@@ -786,11 +786,11 @@ static void cdns_dsi_bridge_atomic_early_enable(struct drm_bridge *bridge,
 	writel(HFP_LEN(dsi_cfg.hfp) | HACT_LEN(dsi_cfg.hact),
 	       dsi->regs + VID_HSIZE2);
 
-	writel(VBP_LEN(mode->crtc_vtotal - mode->crtc_vsync_end - 1) |
-	       VFP_LEN(mode->crtc_vsync_start - mode->crtc_vdisplay) |
-	       VSA_LEN(mode->crtc_vsync_end - mode->crtc_vsync_start + 1),
+	writel(VBP_LEN(mode->vtotal - mode->vsync_end - 1) |
+	       VFP_LEN(mode->vsync_start - mode->vdisplay) |
+	       VSA_LEN(mode->vsync_end - mode->vsync_start + 1),
 	       dsi->regs + VID_VSIZE1);
-	writel(mode->crtc_vdisplay, dsi->regs + VID_VSIZE2);
+	writel(mode->vdisplay, dsi->regs + VID_VSIZE2);
 
 	tmp = dsi_cfg.htotal -
 	      (dsi_cfg.hsa + DSI_BLANKING_FRAME_OVERHEAD +
