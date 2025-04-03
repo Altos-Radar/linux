@@ -168,8 +168,16 @@ static void pi3usb30532_remove(struct i2c_client *client)
 	typec_switch_unregister(pi->sw);
 }
 
+static const struct of_device_id pi3usb30532_dt_match[] __maybe_unused = {
+	{ .compatible = "pericom,pi3usb30532" },
+	{ .compatible = "ti,tmuxhs4446" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, pi3usb30532_dt_match);
+
 static const struct i2c_device_id pi3usb30532_table[] = {
 	{ "pi3usb30532" },
+	{ "tmuxhs4446" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pi3usb30532_table);
@@ -177,6 +185,7 @@ MODULE_DEVICE_TABLE(i2c, pi3usb30532_table);
 static struct i2c_driver pi3usb30532_driver = {
 	.driver = {
 		.name = "pi3usb30532",
+		.of_match_table = of_match_ptr(pi3usb30532_dt_match),
 	},
 	.probe		= pi3usb30532_probe,
 	.remove		= pi3usb30532_remove,
