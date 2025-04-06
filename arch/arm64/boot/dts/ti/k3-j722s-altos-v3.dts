@@ -263,7 +263,7 @@
 
 	main_usb0_pins_default: main-usb0-default-pins {
 		pinctrl-single,pins = <
-			J722S_IOPAD(0x0254, PIN_OUTPUT, 0) /* (E25) USB0_DRVVBUS */
+			J722S_IOPAD(0x0254, PIN_INPUT_PULLDOWN, 7) /* (E25) USB0_DRVVBUS */
 		>;
 	};
 
