@@ -12,7 +12,7 @@
 #include <linux/usb/typec_dp.h>
 #include <linux/usb/typec_mux.h>
 
-#define PI3USB30532_CONF			0x00
+#define PI3USB30532_CONF			0x02
 
 #define PI3USB30532_CONF_OPEN			0x00
 #define PI3USB30532_CONF_SWAP			0x01
