@@ -211,6 +211,18 @@
 			};
 		};
 	};
+
+	dp_conn: connector {
+		compatible = "dp-connector";
+		label = "dp0";
+		type = "full-size";
+
+		port {
+			dp_connector_in: endpoint {
+				remote-endpoint = <&dp0_out>;
+			};
+		};
+	};
 };
 
 &main_pmx0 {
@@ -296,7 +308,8 @@
 
 	dsi_edp_bridge_pins_default: dsi-edp-bridge-defaultpins {
 		pinctrl-single,pins = <
-			J722S_IOPAD(0x0034, PIN_OUTPUT, 7) /* (K22) OSPI_CSn2.GPIO0_13 */
+			J722S_IOPAD(0x0034, PIN_OUTPUT, 7) /* (K22) OSPI0_CSn2.GPIO0_13 */
+			J722S_IOPAD(0x0038, PIN_INPUT, 7) /* (J22) OSPI0_CSn3.GPIO0_14 */
 		>;
 	};
 };
@@ -445,7 +458,7 @@
 					PDO_FIXED_USB_COMM |
 					PDO_FIXED_DATA_SWAP)
 				PDO_VAR(9000, 20000, 3000)>;
-			displayport = <&dsi_edp_bridge>;
+			displayport = <&dss1>;
 
 			altmodes {
 				displayport {
@@ -461,7 +474,7 @@
 				port@1 {
 					reg = <1>;
 					usb_conn_ss: endpoint {
-						remote-endpoint = <&usb0_ss_ep>;
+						remote-endpoint = <&usb1_ss_ep>;
 					};
 				};
 
@@ -513,17 +526,6 @@
 		vcc-supply = <&vsys_io_1v2>;
 
 		aux-bus {
-			panel {
-				compatible = "ti,panel-edp";
-				power-supply = <&vsys_io_3v3>;
-				no-hpd;
-
-				port {
-					dp_panel_in: endpoint {
-						remote-endpoint = <&dp0_out>;
-					};
-				};
-			};
 		};
 
 		dsi_edp_bridge_ports: ports {
@@ -538,7 +540,7 @@
 			port@1 {
 				reg = <1>;
 				dp0_out: endpoint {
-					remote-endpoint = <&dp_panel_in>;
+					remote-endpoint = <&dp_connector_in>;
 				};
 			};
 		};
@@ -680,9 +682,6 @@
 
 &usb0 {
 	dr_mode = "otg";
-	maximum-speed = "super-speed";
-	phys = <&serdes0_usb_link>;
-	phy-names = "cdns3,usb3-phy";
 	usb-role-switch;
 
 	ports {
@@ -690,15 +689,30 @@
 		#size-cells = <0>;
 		port@0 {
 			reg = <0>;
-			usb0_ss_ep: endpoint {
-				remote-endpoint = <&usb_conn_ss>;
-			};
-		};
-
-		port@1 {
-			reg = <1>;
 			usb0_drd_sw: endpoint {
 				remote-endpoint = <&typec_drd_sw>;
+			};
+		};
+	};
+};
+
+&usbss1 {
+	status = "okay";
+};
+
+&usb1 {
+	dr_mode = "host";
+	maximum-speed = "super-speed";
+	phys = <&serdes0_usb_link>;
+	phy-names = "cdns3,usb3-phy";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port@0 {
+			reg = <0>;
+			usb1_ss_ep: endpoint {
+				remote-endpoint = <&usb_conn_ss>;
 			};
 		};
 	};
