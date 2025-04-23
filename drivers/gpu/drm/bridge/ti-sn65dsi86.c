@@ -715,8 +715,8 @@ static int ti_sn_attach_host(struct auxiliary_device *adev, struct ti_sn65dsi86 
 	if (IS_ERR(dsi))
 		return PTR_ERR(dsi);
 
-	/* TODO: setting to 2 MIPI lanes always for now */
-	dsi->lanes = 2;
+	/* TODO: setting to 4 MIPI lanes always for now */
+	dsi->lanes = 4;
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO |
 			  MIPI_DSI_MODE_NO_EOT_PACKET |
@@ -1193,13 +1193,11 @@ static enum drm_connector_status ti_sn_bridge_detect(struct drm_bridge *bridge)
 	int val;
 	u8 link_status[DP_LINK_STATUS_SIZE];
 
-	if (!pdata->plugged) {
-		pm_runtime_get_sync(pdata->dev);
-		val = drm_dp_dpcd_read_link_status(&pdata->aux, link_status);
-		pm_runtime_put_autosuspend(pdata->dev);
-		if (val > 0)
-			pdata->plugged = true;
-	}
+	pm_runtime_get_sync(pdata->dev);
+	val = drm_dp_dpcd_read_link_status(&pdata->aux, link_status);
+	pm_runtime_put_autosuspend(pdata->dev);
+	pdata->plugged = val > 0;
+	dev_warn(pdata->dev, "ti_sn_bridge_detect: %d\n", pdata->plugged);
 
 	return pdata->plugged ? connector_status_connected
 			      : connector_status_disconnected;
@@ -1931,7 +1929,7 @@ static int ti_sn65dsi86_probe(struct i2c_client *client)
 				     "failed to get reference clock\n");
 
 	pm_runtime_enable(dev);
-	pm_runtime_set_autosuspend_delay(pdata->dev, 500);
+	pm_runtime_set_autosuspend_delay(pdata->dev, -1);
 	pm_runtime_use_autosuspend(pdata->dev);
 	ret = devm_add_action_or_reset(dev, ti_sn65dsi86_runtime_disable, dev);
 	if (ret)
