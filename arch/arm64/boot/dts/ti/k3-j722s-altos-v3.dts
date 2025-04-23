@@ -279,12 +279,21 @@
 		>;
 	};
 
+	awr1_pins_default: awr1-pins-default {
+		pinctrl-single,pins = <
+			J722S_IOPAD(0x0088, PIN_INPUT, 7) /* (N22) GPMC0_OEn_REn.GPIO0_33 */
+			J722S_IOPAD(0x00a8, PIN_OUTPUT, 7) /* (R27) GPMC0_CSn0.GPIO0_41 */
+		>;
+	};
+
 	main_spi0_pins_default: main-spi0-default-pins {
 		pinctrl-single,pins = <
 			J722S_IOPAD(0x01bc, PIN_OUTPUT, 0)	/* (D20) SPI0_CLK */
 			J722S_IOPAD(0x01b4, PIN_OUTPUT, 0)	/* (B20) SPI0_CS0 */
 			J722S_IOPAD(0x01c0, PIN_INPUT, 0)	/* (E19) SPI0_D0 */
 			J722S_IOPAD(0x01c4, PIN_OUTPUT, 0)	/* (E20) SPI0_D1 */
+			J722S_IOPAD(0x008c, PIN_INPUT, 7) /* (N23) GPMC0_WEn.GPIO0_34 */
+			J722S_IOPAD(0x00ac, PIN_OUTPUT, 7) /* (P21) GPMC0_CSn1.GPIO0_42 */
 		>;
 	};
 
@@ -294,6 +303,8 @@
 			J722S_IOPAD(0x023c, PIN_OUTPUT, 5)	/* (H22) MMC1_CMD.SPI1_CLK */
 			J722S_IOPAD(0x0228, PIN_OUTPUT, 5)	/* (J23) MMC1_DAT2.SPI1_D1 */
 			J722S_IOPAD(0x0224, PIN_INPUT, 5)	/* (H25) MMC1_DAT3.SPI1_D0 */
+			J722S_IOPAD(0x0090, PIN_INPUT, 7) /* (P27) GPMC0_BE0n_CLE.GPIO0_35 */
+			J722S_IOPAD(0x00b0, PIN_OUTPUT, 7) /* (P22) GPMC0_CSn2.GPIO0_43 */
 		>;
 	};
 
@@ -303,6 +314,8 @@
 			J722S_IOPAD(0x01ac, PIN_OUTPUT, 1)	/* (C27) MCASP0_AFSR.SPI2_CS0 */
 			J722S_IOPAD(0x0198, PIN_OUTPUT, 1)	/* (A26) MCASP0_AXR2.SPI2_D1 */
 			J722S_IOPAD(0x0194, PIN_INPUT, 1)	/* (A25) MCASP0_AXR3.SPI2_D0 */
+			J722S_IOPAD(0x0094, PIN_INPUT, 7) /* (P26) GPMC0_BE1n.GPIO0_36 */
+			J722S_IOPAD(0x00b4, PIN_OUTPUT, 7) /* (P23) GPMC0_CSn3.GPIO0_44 */
 		>;
 	};
 
@@ -805,7 +818,7 @@
 &mcu_spi1 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&mcu_spi1_pins_default>;
+	pinctrl-0 = <&mcu_spi1_pins_default>, <&awr1_pins_default>;
 	ti,spi-num-cs = <1>;
 
 	awr_spi_1: spi@0 {
