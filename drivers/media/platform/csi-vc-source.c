@@ -162,7 +162,7 @@ static int csi_vc_probe(struct platform_device *pdev)
 	snprintf(priv->subdev.name, V4L2_SUBDEV_NAME_SIZE, "%s.%s",
 		 KBUILD_MODNAME, dev_name(&pdev->dev));
 
-	priv->tx_link_freq = 720000000;
+	priv->tx_link_freq = 300000000;
 	v4l2_ctrl_handler_init(&priv->ctrl_handler, 1);
 	priv->link_freq = v4l2_ctrl_new_int_menu(&priv->ctrl_handler, NULL, V4L2_CID_LINK_FREQ,
 						 0, 0, &priv->tx_link_freq);
