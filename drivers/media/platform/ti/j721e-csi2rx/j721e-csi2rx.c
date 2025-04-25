@@ -739,7 +739,7 @@ static void ti_csi2rx_dma_callback(void *param)
 	 * TODO: Derive the sequence number from the CSI2RX frame number
 	 * hardware monitor registers.
 	 */
-	buf->vb.vb2_buf.timestamp = ktime_get_ns();
+	buf->vb.vb2_buf.timestamp = ktime_get_real_ns();
 	buf->vb.sequence = ctx->sequence++;
 
 	spin_lock_irqsave(&dma->lock, flags);
@@ -1315,7 +1315,7 @@ static int ti_csi2rx_init_vb2q(struct ti_csi2rx_ctx *ctx)
 	q->buf_struct_size = sizeof(struct ti_csi2rx_buffer);
 	q->ops = &csi_vb2_qops;
 	q->mem_ops = &vb2_dma_contig_memops;
-	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+	q->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN;
 	q->dev = dmaengine_get_dma_device(ctx->dma.chan);
 	q->lock = &ctx->mutex;
 	q->min_buffers_needed = 1;
