@@ -124,6 +124,8 @@ static int rpvb_buf_out_validate(struct vb2_buffer *vb)
 
 static int rpvb_start_streaming(struct vb2_queue *q, unsigned int count)
 {
+	struct rpvb_ctx *ctx = q->drv_priv;
+	v4l2_m2m_update_start_streaming_state(ctx->fh.m2m_ctx, q);
 	return 0;
 }
 
@@ -141,6 +143,7 @@ static void rpvb_stop_streaming(struct vb2_queue *q)
 			v4l2_m2m_buf_done(vbuf, VB2_BUF_STATE_ERROR);
 		}
 	}
+	v4l2_m2m_update_stop_streaming_state(ctx->fh.m2m_ctx, q);
 }
 
 static int rpvb_buf_prepare(struct vb2_buffer *vb)
