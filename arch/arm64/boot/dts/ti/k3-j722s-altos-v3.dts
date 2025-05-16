@@ -339,7 +339,7 @@
 	pinctrl-0 = <&mdio_pins_default>;
 
 	cpsw3g_phy0: ethernet-phy@0 {
-		reg = <0x0F>;
+		reg = <0x00>;
 		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
 		ti,min-output-impedance;
