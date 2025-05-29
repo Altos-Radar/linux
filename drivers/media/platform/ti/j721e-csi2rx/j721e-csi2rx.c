@@ -1384,18 +1384,6 @@ static int ti_csi2rx_link_validate(struct media_link *link)
 		return 0;
 	}
 
-	if (source_fmt.format.width != csi_fmt->width) {
-		dev_err(csi->dev, "Width does not match (source %u, sink %u)\n",
-			source_fmt.format.width, csi_fmt->width);
-		return -EPIPE;
-	}
-
-	if (source_fmt.format.height != csi_fmt->height) {
-		dev_err(csi->dev, "Height does not match (source %u, sink %u)\n",
-			source_fmt.format.height, csi_fmt->height);
-		return -EPIPE;
-	}
-
 	if (source_fmt.format.field != csi_fmt->field &&
 	    csi_fmt->field != V4L2_FIELD_NONE) {
 		dev_err(csi->dev, "Field does not match (source %u, sink %u)\n",
