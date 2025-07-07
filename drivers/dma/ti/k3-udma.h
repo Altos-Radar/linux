@@ -432,7 +432,7 @@ struct udma_dev {
 	int (*udma_stop)(struct udma_chan *uc);
 	int (*udma_reset_chan)(struct udma_chan *uc, bool hard);
 	bool (*udma_is_desc_really_done)(struct udma_chan *uc, struct udma_desc *d);
-	void (*udma_decrement_byte_counters)(struct udma_chan *uc, u32 val);
+	void (*udma_decrement_byte_counters)(struct udma_chan *uc, struct udma_desc *d);
 };
 
 struct udma_chan {
@@ -440,8 +440,6 @@ struct udma_chan {
 	struct dma_slave_config	cfg;
 	struct udma_dev *ud;
 	struct device *dma_dev;
-	struct udma_desc *desc;
-	struct udma_desc *terminated_desc;
 	struct udma_static_tr static_tr;
 	char *name;
 
@@ -567,9 +565,9 @@ static inline void udma_fetch_epib(struct udma_chan *uc, struct udma_desc *d)
 	memcpy(d->metadata, h_desc->epib, d->metadata_size);
 }
 
-void udma_start_desc(struct udma_chan *uc);
-bool udma_chan_needs_reconfiguration(struct udma_chan *uc);
-void udma_cyclic_packet_elapsed(struct udma_chan *uc);
+void udma_start_all_desc(struct udma_chan *uc);
+bool udma_chan_needs_reconfiguration(struct udma_chan *uc, struct udma_desc *d);
+void udma_cyclic_packet_elapsed(struct udma_chan *uc, struct udma_desc *d);
 void udma_check_tx_completion(struct work_struct *work);
 void udma_issue_pending(struct dma_chan *chan);
 void udma_free_chan_resources(struct dma_chan *chan);
@@ -592,7 +590,7 @@ void udma_purge_desc_work(struct work_struct *work);
 void udma_desc_free(struct virt_dma_desc *vd);
 bool udma_is_chan_running(struct udma_chan *uc);
 void udma_reset_rings(struct udma_chan *uc);
-int udma_push_to_ring(struct udma_chan *uc, int idx);
+int udma_push_to_ring(struct udma_chan *uc, int idx, struct udma_desc *d);
 bool udma_desc_is_rx_flush(struct udma_chan *uc, dma_addr_t addr);
 int udma_pop_from_ring(struct udma_chan *uc, dma_addr_t *addr);
 

@@ -114,28 +114,14 @@ void udma_dump_chan_stdata(struct udma_chan *uc)
 struct udma_desc *udma_udma_desc_from_paddr(struct udma_chan *uc,
 						   dma_addr_t paddr)
 {
-	struct udma_desc *d = uc->terminated_desc;
-
-	if (d) {
-		dma_addr_t desc_paddr = udma_curr_cppi5_desc_paddr(d,
-								   d->desc_idx);
-
-		if (desc_paddr != paddr)
-			d = NULL;
+	struct udma_desc *d;
+	list_for_each_entry(d, &uc->vc.desc_issued, vd.node) {
+		dma_addr_t desc_paddr = udma_curr_cppi5_desc_paddr(d, d->desc_idx);
+		if (desc_paddr == paddr)
+			return d;
 	}
 
-	if (!d) {
-		d = uc->desc;
-		if (d) {
-			dma_addr_t desc_paddr = udma_curr_cppi5_desc_paddr(d,
-								d->desc_idx);
-
-			if (desc_paddr != paddr)
-				d = NULL;
-		}
-	}
-
-	return d;
+	return NULL;
 }
 
 void udma_free_hwdesc(struct udma_chan *uc, struct udma_desc *d)
@@ -194,9 +180,6 @@ void udma_desc_free(struct virt_dma_desc *vd)
 	struct udma_desc *d = to_udma_desc(&vd->tx);
 	unsigned long flags;
 
-	if (uc->terminated_desc == d)
-		uc->terminated_desc = NULL;
-
 	if (uc->use_dma_pool) {
 		udma_free_hwdesc(uc, d);
 		kfree(d);
@@ -230,6 +213,8 @@ void udma_reset_rings(struct udma_chan *uc)
 {
 	struct k3_ring *ring1 = NULL;
 	struct k3_ring *ring2 = NULL;
+	struct virt_dma_desc *vd, *_vd;
+	unsigned long flags;
 
 	switch (uc->config.dir) {
 		case DMA_DEV_TO_MEM:
@@ -256,15 +241,15 @@ void udma_reset_rings(struct udma_chan *uc)
 		k3_ringacc_ring_reset(ring2);
 
 	/* make sure we are not leaking memory by stalled descriptor */
-	if (uc->terminated_desc) {
-		udma_desc_free(&uc->terminated_desc->vd);
-		uc->terminated_desc = NULL;
+	spin_lock_irqsave(&uc->vc.lock, flags);
+	list_for_each_entry_safe(vd, _vd, &uc->vc.desc_issued, node) {
+		udma_desc_free(vd);
 	}
+	spin_unlock_irqrestore(&uc->vc.lock, flags);
 }
 
-int udma_push_to_ring(struct udma_chan *uc, int idx)
+int udma_push_to_ring(struct udma_chan *uc, int idx, struct udma_desc *d)
 {
-	struct udma_desc *d = uc->desc;
 	struct k3_ring *ring = NULL;
 	dma_addr_t paddr;
 
@@ -337,13 +322,44 @@ int udma_pop_from_ring(struct udma_chan *uc, dma_addr_t *addr)
 	return 0;
 }
 
-void udma_start_desc(struct udma_chan *uc)
+bool udma_chan_needs_reconfiguration(struct udma_chan *uc, struct udma_desc *d)
+{
+	/* Only PDMAs have staticTR */
+	if (uc->config.ep_type == PSIL_EP_NATIVE)
+		return false;
+
+	/* Check if the staticTR configuration has changed for TX */
+	if (memcmp(&uc->static_tr, &d->static_tr, sizeof(uc->static_tr)))
+		return true;
+
+	return false;
+}
+
+void udma_start_all_desc(struct udma_chan *uc)
 {
 	struct udma_chan_config *ucc = &uc->config;
+	struct k3_ring *ring = NULL;
+	struct udma_static_tr *last_static_tr = &uc->static_tr;
+	switch (uc->config.dir) {
+	case DMA_DEV_TO_MEM:
+		ring = uc->rflow->fd_ring;
+		break;
+	case DMA_MEM_TO_DEV:
+	case DMA_MEM_TO_MEM:
+		ring = uc->tchan->t_ring;
+		break;
+	default:
+		dev_err(uc->dma_dev, "Invalid direction: %d\n", uc->config.dir);
+		return;
+	}
 
 	if (uc->ud->match_data->type == DMA_TYPE_UDMA && ucc->pkt_mode &&
-	    (uc->cyclic || ucc->dir == DMA_DEV_TO_MEM)) {
-		int i;
+	    (uc->cyclic || ucc->dir == DMA_DEV_TO_MEM) && list_empty(&uc->vc.desc_issued)) {
+		struct udma_desc *d =
+			list_first_entry_or_null(&uc->vc.desc_submitted,
+				struct udma_desc, vd.node);
+		if (!d)
+			return;
 
 		/*
 		 * UDMA only: Push all descriptors to ring for packet mode
@@ -351,34 +367,30 @@ void udma_start_desc(struct udma_chan *uc)
 		 * PKTDMA supports pre-linked descriptor and cyclic is not
 		 * supported
 		 */
-		for (i = 0; i < uc->desc->sglen; i++)
-			udma_push_to_ring(uc, i);
-	} else {
-		udma_push_to_ring(uc, 0);
+		list_move_tail(&d->vd.node, &uc->vc.desc_issued);
+		for (int i = 0; i < d->sglen; i++)
+			udma_push_to_ring(uc, i, d);
+		return;
+	}
+	while (!k3_ringacc_ring_is_full(ring)) {
+		struct udma_desc *d =
+			list_first_entry_or_null(&uc->vc.desc_submitted,
+				struct udma_desc, vd.node);
+		if (!d || udma_chan_needs_reconfiguration(uc, d))
+			break;
+		list_move_tail(&d->vd.node, &uc->vc.desc_issued);
+		udma_push_to_ring(uc, 0, d);
+		last_static_tr = &d->static_tr;
 	}
 }
 
-bool udma_chan_needs_reconfiguration(struct udma_chan *uc)
+void udma_cyclic_packet_elapsed(struct udma_chan *uc, struct udma_desc *d)
 {
-	/* Only PDMAs have staticTR */
-	if (uc->config.ep_type == PSIL_EP_NATIVE)
-		return false;
-
-	/* Check if the staticTR configuration has changed for TX */
-	if (memcmp(&uc->static_tr, &uc->desc->static_tr, sizeof(uc->static_tr)))
-		return true;
-
-	return false;
-}
-
-void udma_cyclic_packet_elapsed(struct udma_chan *uc)
-{
-	struct udma_desc *d = uc->desc;
 	struct cppi5_host_desc_t *h_desc;
 
 	h_desc = d->hwdesc[d->desc_idx].cppi5_desc_vaddr;
 	cppi5_hdesc_reset_to_original(h_desc);
-	udma_push_to_ring(uc, d->desc_idx);
+	udma_push_to_ring(uc, d->desc_idx, d);
 	d->desc_idx = (d->desc_idx + 1) % d->sglen;
 }
 
@@ -393,7 +405,9 @@ void udma_check_tx_completion(struct work_struct *work)
 	unsigned long delay;
 
 	while (1) {
-		if (uc->desc) {
+		struct udma_desc *d =
+			list_first_entry_or_null(&uc->vc.desc_issued, struct udma_desc, vd.node);
+		if (d) {
 			/* Get previous residue and time stamp */
 			residue_diff = uc->tx_drain.residue;
 			time_diff = uc->tx_drain.tstamp;
@@ -401,7 +415,7 @@ void udma_check_tx_completion(struct work_struct *work)
 			 * Get current residue and time stamp or see if
 			 * transfer is complete
 			 */
-			desc_done = ud->udma_is_desc_really_done(uc, uc->desc);
+			desc_done = ud->udma_is_desc_really_done(uc, d);
 		}
 
 		if (!desc_done) {
@@ -432,12 +446,11 @@ void udma_check_tx_completion(struct work_struct *work)
 			continue;
 		}
 
-		if (uc->desc) {
-			struct udma_desc *d = uc->desc;
-
-			ud->udma_decrement_byte_counters(uc, d->residue);
-			ud->udma_start(uc);
+		if (d) {
+			ud->udma_decrement_byte_counters(uc, d);
+			list_del(&d->vd.node);
 			vchan_cookie_complete(&d->vd);
+			ud->udma_start(uc);
 			break;
 		}
 
@@ -1892,15 +1905,14 @@ void udma_issue_pending(struct dma_chan *chan)
 
 	spin_lock_irqsave(&uc->vc.lock, flags);
 
-	/* If we have something pending and no active descriptor, then */
-	if (vchan_issue_pending(&uc->vc) && !uc->desc) {
+	/* If we have submitted descriptors, then */
+	if (!list_empty(&uc->vc.desc_submitted)) {
 		/*
-		 * start a descriptor if the channel is NOT [marked as
+		 * queue it up if the channel is NOT [marked as
 		 * terminating _and_ it is still running (teardown has not
 		 * completed yet)].
 		 */
-		if (!(uc->state == UDMA_CHAN_IS_TERMINATING &&
-		      udma_is_chan_running(uc)))
+		if (uc->state != UDMA_CHAN_IS_TERMINATING)
 			ud->udma_start(uc);
 	}
 
@@ -1911,6 +1923,7 @@ int udma_terminate_all(struct dma_chan *chan)
 {
 	struct udma_chan *uc = to_udma_chan(chan);
 	struct udma_dev *ud = to_udma_dev(chan->device);
+	struct udma_desc *d;
 	unsigned long flags;
 	LIST_HEAD(head);
 
@@ -1919,12 +1932,10 @@ int udma_terminate_all(struct dma_chan *chan)
 	if (udma_is_chan_running(uc))
 		ud->udma_stop(uc);
 
-	if (uc->desc) {
-		uc->terminated_desc = uc->desc;
-		uc->desc = NULL;
-		uc->terminated_desc->terminated = true;
-		cancel_delayed_work(&uc->tx_drain.work);
+	list_for_each_entry(d, &uc->vc.desc_issued, vd.node) {
+		d->terminated = true;
 	}
+	cancel_delayed_work(&uc->tx_drain.work);
 
 	uc->paused = false;
 
@@ -2047,7 +2058,7 @@ void udma_free_chan_resources(struct dma_chan *chan)
 	struct udma_dev *ud = to_udma_dev(chan->device);
 
 	udma_terminate_all(chan);
-	if (uc->terminated_desc) {
+	if (!list_empty(&uc->vc.desc_issued)) {
 		ud->udma_reset_chan(uc, false);
 		udma_reset_rings(uc);
 	}

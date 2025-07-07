@@ -88,9 +88,10 @@ static bool udma_is_chan_paused(struct udma_chan *uc)
 	return false;
 }
 
-static void udma_decrement_byte_counters(struct udma_chan *uc, u32 val)
+static void udma_decrement_byte_counters(struct udma_chan *uc, struct udma_desc *d)
 {
-	if (uc->desc->dir == DMA_DEV_TO_MEM) {
+	u32 val = d->residue;
+	if (d->dir == DMA_DEV_TO_MEM) {
 		udma_rchanrt_write(uc, UDMA_CHAN_RT_BCNT_REG, val);
 		udma_rchanrt_write(uc, UDMA_CHAN_RT_SBCNT_REG, val);
 		if (uc->config.ep_type != PSIL_EP_NATIVE)
@@ -191,20 +192,15 @@ static int udma_reset_chan(struct udma_chan *uc, bool hard)
 
 static int udma_start(struct udma_chan *uc)
 {
-	struct virt_dma_desc *vd = vchan_next_desc(&uc->vc);
-
-	if (!vd) {
-		uc->desc = NULL;
+	struct udma_desc *d =
+		list_first_entry_or_null(&uc->vc.desc_submitted, struct udma_desc, vd.node);
+	if (!d) {
 		return -ENOENT;
 	}
 
-	list_del(&vd->node);
-
-	uc->desc = to_udma_desc(&vd->tx);
-
 	/* Channel is already running and does not need reconfiguration */
-	if (udma_is_chan_running(uc) && !udma_chan_needs_reconfiguration(uc)) {
-		udma_start_desc(uc);
+	if (udma_is_chan_running(uc) && !udma_chan_needs_reconfiguration(uc, d)) {
+		udma_start_all_desc(uc);
 		goto out;
 	}
 
@@ -212,14 +208,14 @@ static int udma_start(struct udma_chan *uc)
 	udma_reset_chan(uc, false);
 
 	/* Push descriptors before we start the channel */
-	udma_start_desc(uc);
+	udma_start_all_desc(uc);
 
-	switch (uc->desc->dir) {
+	switch (d->dir) {
 	case DMA_DEV_TO_MEM:
 		/* Config remote TR */
 		if (uc->config.ep_type == PSIL_EP_PDMA_XY) {
-			u32 val = PDMA_STATIC_TR_Y(uc->desc->static_tr.elcnt) |
-				  PDMA_STATIC_TR_X(uc->desc->static_tr.elsize);
+			u32 val = PDMA_STATIC_TR_Y(d->static_tr.elcnt) |
+				  PDMA_STATIC_TR_X(d->static_tr.elsize);
 			const struct udma_match_data *match_data =
 							uc->ud->match_data;
 
@@ -234,11 +230,11 @@ static int udma_start(struct udma_chan *uc)
 
 			udma_rchanrt_write(uc,
 				UDMA_CHAN_RT_PEER_STATIC_TR_Z_REG,
-				PDMA_STATIC_TR_Z(uc->desc->static_tr.bstcnt,
+				PDMA_STATIC_TR_Z(d->static_tr.bstcnt,
 						 match_data->statictr_z_mask));
 
 			/* save the current staticTR configuration */
-			memcpy(&uc->static_tr, &uc->desc->static_tr,
+			memcpy(&uc->static_tr, &d->static_tr,
 			       sizeof(uc->static_tr));
 		}
 
@@ -253,8 +249,8 @@ static int udma_start(struct udma_chan *uc)
 	case DMA_MEM_TO_DEV:
 		/* Config remote TR */
 		if (uc->config.ep_type == PSIL_EP_PDMA_XY) {
-			u32 val = PDMA_STATIC_TR_Y(uc->desc->static_tr.elcnt) |
-				  PDMA_STATIC_TR_X(uc->desc->static_tr.elsize);
+			u32 val = PDMA_STATIC_TR_Y(d->static_tr.elcnt) |
+				  PDMA_STATIC_TR_X(d->static_tr.elsize);
 
 			if (uc->config.enable_acc32)
 				val |= PDMA_STATIC_TR_XY_ACC32;
@@ -266,7 +262,7 @@ static int udma_start(struct udma_chan *uc)
 					   val);
 
 			/* save the current staticTR configuration */
-			memcpy(&uc->static_tr, &uc->desc->static_tr,
+			memcpy(&uc->static_tr, &d->static_tr,
 			       sizeof(uc->static_tr));
 		}
 
@@ -304,8 +300,8 @@ static int udma_stop(struct udma_chan *uc)
 
 	switch (uc->config.dir) {
 	case DMA_DEV_TO_MEM:
-		if (!uc->cyclic && !uc->desc)
-			udma_push_to_ring(uc, -1);
+		if (!uc->cyclic && list_empty(&uc->vc.desc_issued))
+			udma_push_to_ring(uc, -1, NULL);
 
 		udma_rchanrt_write(uc, UDMA_CHAN_RT_PEER_RT_EN_REG,
 				   UDMA_PEER_RT_EN_ENABLE |
@@ -375,40 +371,33 @@ static irqreturn_t udma_ring_irq_handler(int irq, void *data)
 	if (cppi5_desc_is_tdcm(paddr)) {
 		complete_all(&uc->teardown_completed);
 
-		if (uc->terminated_desc) {
-			udma_desc_free(&uc->terminated_desc->vd);
-			uc->terminated_desc = NULL;
-		}
-
-		if (!uc->desc)
+		if (list_empty(&uc->vc.desc_issued))
 			udma_start(uc);
 
 		goto out;
 	}
 
 	d = udma_udma_desc_from_paddr(uc, paddr);
-
 	if (d) {
-		dma_addr_t desc_paddr = udma_curr_cppi5_desc_paddr(d,
-								   d->desc_idx);
+		dma_addr_t desc_paddr = udma_curr_cppi5_desc_paddr(d, d->desc_idx);
 		if (desc_paddr != paddr) {
 			dev_err(uc->ud->dev, "not matching descriptors!\n");
 			goto out;
 		}
 
-		if (d == uc->desc) {
+		if (!d->terminated) {
 			/* active descriptor */
 			if (uc->cyclic) {
-				udma_cyclic_packet_elapsed(uc);
+				udma_cyclic_packet_elapsed(uc, d);
 				vchan_cyclic_callback(&d->vd);
 			} else {
 				if (udma_is_desc_really_done(uc, d)) {
-					udma_decrement_byte_counters(uc, d->residue);
-					udma_start(uc);
+					udma_decrement_byte_counters(uc, d);
+					list_del(&d->vd.node);
 					vchan_cookie_complete(&d->vd);
+					udma_start(uc);
 				} else {
-					schedule_delayed_work(&uc->tx_drain.work,
-							      0);
+					schedule_delayed_work(&uc->tx_drain.work, 0);
 				}
 			}
 		} else {
@@ -418,6 +407,9 @@ static irqreturn_t udma_ring_irq_handler(int irq, void *data)
 			 */
 			dma_cookie_complete(&d->vd.tx);
 		}
+	}
+	if (list_empty(&uc->vc.desc_issued)) {
+		dev_warn(uc->ud->dev, "Empty UDMA ring: %s\n", uc->name);
 	}
 out:
 	spin_unlock(&uc->vc.lock);
@@ -431,7 +423,7 @@ static irqreturn_t udma_udma_irq_handler(int irq, void *data)
 	struct udma_desc *d;
 
 	spin_lock(&uc->vc.lock);
-	d = uc->desc;
+	d = list_first_entry_or_null(&uc->vc.desc_issued, struct udma_desc, vd.node);
 	if (d) {
 		d->tr_idx = (d->tr_idx + 1) % d->sglen;
 
@@ -439,9 +431,10 @@ static irqreturn_t udma_udma_irq_handler(int irq, void *data)
 			vchan_cyclic_callback(&d->vd);
 		} else {
 			/* TODO: figure out the real amount of data */
-			udma_decrement_byte_counters(uc, d->residue);
-			udma_start(uc);
+			udma_decrement_byte_counters(uc, d);
+			list_del(&d->vd.node);
 			vchan_cookie_complete(&d->vd);
+			udma_start(uc);
 		}
 	}
 
@@ -1583,6 +1576,7 @@ static enum dma_status udma_tx_status(struct dma_chan *chan,
 				      struct dma_tx_state *txstate)
 {
 	struct udma_chan *uc = to_udma_chan(chan);
+	struct udma_desc *d = NULL;
 	enum dma_status ret;
 	unsigned long flags;
 
@@ -1599,13 +1593,14 @@ static enum dma_status udma_tx_status(struct dma_chan *chan,
 	if (ret == DMA_COMPLETE || !txstate)
 		goto out;
 
-	if (uc->desc && uc->desc->vd.tx.cookie == cookie) {
+	d = list_first_entry_or_null(&uc->vc.desc_issued, struct udma_desc, vd.node);
+	if (d && d->vd.tx.cookie == cookie) {
 		u32 peer_bcnt = 0;
 		u32 bcnt = 0;
-		u32 residue = uc->desc->residue;
+		u32 residue = d->residue;
 		u32 delay = 0;
 
-		if (uc->desc->dir == DMA_MEM_TO_DEV) {
+		if (d->dir == DMA_MEM_TO_DEV) {
 			bcnt = udma_tchanrt_read(uc, UDMA_CHAN_RT_SBCNT_REG);
 
 			if (uc->config.ep_type != PSIL_EP_NATIVE) {
@@ -1615,7 +1610,7 @@ static enum dma_status udma_tx_status(struct dma_chan *chan,
 				if (bcnt > peer_bcnt)
 					delay = bcnt - peer_bcnt;
 			}
-		} else if (uc->desc->dir == DMA_DEV_TO_MEM) {
+		} else if (d->dir == DMA_DEV_TO_MEM) {
 			bcnt = udma_rchanrt_read(uc, UDMA_CHAN_RT_BCNT_REG);
 
 			if (uc->config.ep_type != PSIL_EP_NATIVE) {
@@ -1629,10 +1624,10 @@ static enum dma_status udma_tx_status(struct dma_chan *chan,
 			bcnt = udma_tchanrt_read(uc, UDMA_CHAN_RT_BCNT_REG);
 		}
 
-		if (bcnt && !(bcnt % uc->desc->residue))
+		if (bcnt && !(bcnt % d->residue))
 			residue = 0;
 		else
-			residue -= bcnt % uc->desc->residue;
+			residue -= bcnt % d->residue;
 
 		if (!residue && (uc->config.dir == DMA_DEV_TO_MEM || !delay)) {
 			ret = DMA_COMPLETE;
