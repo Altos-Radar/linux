@@ -1197,7 +1197,7 @@ static enum drm_connector_status ti_sn_bridge_detect(struct drm_bridge *bridge)
 	val = drm_dp_dpcd_read_link_status(&pdata->aux, link_status);
 	pm_runtime_put_autosuspend(pdata->dev);
 	pdata->plugged = val > 0;
-	dev_warn(pdata->dev, "ti_sn_bridge_detect: %d\n", pdata->plugged);
+	dev_warn(pdata->dev, "ti_sn_bridge_detect: %d\n", val);
 
 	return pdata->plugged ? connector_status_connected
 			      : connector_status_disconnected;
