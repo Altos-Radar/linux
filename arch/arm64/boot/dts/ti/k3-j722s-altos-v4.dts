@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /*
- * Device Tree file for Altos V3
+ * Device Tree file for Altos V4
  * Copyright (C) 2025 Altos Radar
  */
 
@@ -9,25 +9,19 @@
 #include "k3-j722s-altos-v3-base.dtsi"
 
 / {
-	model = "Altos V3";
+	model = "Altos V4";
 };
 
 &main_pmx0 {
-	awr1_pins_default: awr1-pins-default {
-		pinctrl-single,pins = <
-			J722S_IOPAD(0x0088, PIN_INPUT, 7) /* (N22) GPMC0_OEn_REn.GPIO0_33 */
-			J722S_IOPAD(0x00a8, PIN_OUTPUT, 7) /* (R27) GPMC0_CSn0.GPIO0_41 */
-		>;
-	};
-
 	main_spi0_pins_default: main-spi0-default-pins {
 		pinctrl-single,pins = <
 			J722S_IOPAD(0x01bc, PIN_OUTPUT, 0)	/* (D20) SPI0_CLK */
 			J722S_IOPAD(0x01b4, PIN_OUTPUT, 0)	/* (B20) SPI0_CS0 */
 			J722S_IOPAD(0x01c0, PIN_INPUT, 0)	/* (E19) SPI0_D0 */
 			J722S_IOPAD(0x01c4, PIN_OUTPUT, 0)	/* (E20) SPI0_D1 */
-			J722S_IOPAD(0x008c, PIN_INPUT, 7) /* (N23) GPMC0_WEn.GPIO0_34 */
-			J722S_IOPAD(0x00ac, PIN_OUTPUT, 7) /* (P21) GPMC0_CSn1.GPIO0_42 */
+			J722S_IOPAD(0x0088, PIN_INPUT, 7)	/* (N22) GPMC0_OEn_REn.GPIO0_33 */
+			J722S_IOPAD(0x00a8, PIN_OUTPUT, 7)	/* (R27) GPMC0_CSn0.GPIO0_41 */
+			J722S_IOPAD(0x01b8, PIN_INPUT, 7)	/* (C20) SPI0_CS1.GPIO1_16 */
 		>;
 	};
 
@@ -37,19 +31,9 @@
 			J722S_IOPAD(0x023c, PIN_OUTPUT, 5)	/* (H22) MMC1_CMD.SPI1_CLK */
 			J722S_IOPAD(0x0228, PIN_OUTPUT, 5)	/* (J23) MMC1_DAT2.SPI1_D1 */
 			J722S_IOPAD(0x0224, PIN_INPUT, 5)	/* (H25) MMC1_DAT3.SPI1_D0 */
-			J722S_IOPAD(0x0090, PIN_INPUT, 7) /* (P27) GPMC0_BE0n_CLE.GPIO0_35 */
-			J722S_IOPAD(0x00b0, PIN_OUTPUT, 7) /* (P22) GPMC0_CSn2.GPIO0_43 */
-		>;
-	};
-
-	main_spi2_pins_default: main-spi2-default-pins {
-		pinctrl-single,pins = <
-			J722S_IOPAD(0x01b0, PIN_OUTPUT, 1)	/* (F24) MCASP0_ACLKR.SPI2_CLK */
-			J722S_IOPAD(0x01ac, PIN_OUTPUT, 1)	/* (C27) MCASP0_AFSR.SPI2_CS0 */
-			J722S_IOPAD(0x0198, PIN_OUTPUT, 1)	/* (A26) MCASP0_AXR2.SPI2_D1 */
-			J722S_IOPAD(0x0194, PIN_INPUT, 1)	/* (A25) MCASP0_AXR3.SPI2_D0 */
-			J722S_IOPAD(0x0094, PIN_INPUT, 7) /* (P26) GPMC0_BE1n.GPIO0_36 */
-			J722S_IOPAD(0x00b4, PIN_OUTPUT, 7) /* (P23) GPMC0_CSn3.GPIO0_44 */
+			J722S_IOPAD(0x008c, PIN_INPUT, 7)	/* (N23) GPMC0_WEn.GPIO0_34 */
+			J722S_IOPAD(0x00ac, PIN_OUTPUT, 7)	/* (P21) GPMC0_CSn1.GPIO0_42 */
+			J722S_IOPAD(0x022c, PIN_INPUT, 7)	/* (H20) MMC1_DAT1.GPIO1_44 */
 		>;
 	};
 };
@@ -61,7 +45,6 @@
 			J722S_MCU_IOPAD(0x000, PIN_OUTPUT, 0)   /* (C12) MCU_SPI0_CS0 */
 			J722S_MCU_IOPAD(0x00C, PIN_INPUT, 0)    /* (B12) MCU_SPI0_D0 */
 			J722S_MCU_IOPAD(0x010, PIN_OUTPUT, 0)   /* (C11) MCU_SPI0_D1 */
-			J722S_MCU_IOPAD(0x024, PIN_OUTPUT, 2)   /* (B3) WKUP_UART0_RXD.MCU_SPI0_CS2 */
 		>;
 	};
 
@@ -79,17 +62,11 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcu_spi0_pins_default>;
-	ti,spi-num-cs = <3>;
+	ti,spi-num-cs = <1>;
 
 	awr_pmic_1: spi@0 {
 		compatible = "rohm,dh2228fv";
 		reg = <0>;
-		spi-max-frequency = <5000000>;
-	};
-
-	awr_pmic_2: spi@2 {
-		compatible = "rohm,dh2228fv";
-		reg = <2>;
 		spi-max-frequency = <5000000>;
 	};
 };
@@ -97,10 +74,10 @@
 &mcu_spi1 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&mcu_spi1_pins_default>, <&awr1_pins_default>;
+	pinctrl-0 = <&mcu_spi1_pins_default>;
 	ti,spi-num-cs = <1>;
 
-	awr_spi_1: spi@0 {
+	awr_pmic2: spi@0 {
 		compatible = "rohm,dh2228fv";
 		reg = <0>;
 		spi-max-frequency = <40000000>;
@@ -113,7 +90,7 @@
 	pinctrl-0 = <&main_spi0_pins_default>;
 	ti,spi-num-cs = <1>;
 
-	awr_spi_2: spi@0 {
+	awr_spi_1: spi@0 {
 		compatible = "rohm,dh2228fv";
 		reg = <0>;
 		spi-max-frequency = <40000000>;
@@ -126,20 +103,7 @@
 	pinctrl-0 = <&main_spi1_pins_default>;
 	ti,spi-num-cs = <1>;
 
-	awr_spi_3: spi@0 {
-		compatible = "rohm,dh2228fv";
-		reg = <0>;
-		spi-max-frequency = <40000000>;
-	};
-};
-
-&main_spi2 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&main_spi2_pins_default>;
-	ti,spi-num-cs = <1>;
-
-	awr_spi_4: spi@0 {
+	awr_spi_2: spi@0 {
 		compatible = "rohm,dh2228fv";
 		reg = <0>;
 		spi-max-frequency = <40000000>;
