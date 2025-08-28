@@ -302,6 +302,8 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&mdio_pins_default>;
+	assigned-clocks = <&k3_clks 226 0>;
+	assigned-clock-parents = <&k3_clks 226 7>;
 
 	cpsw3g_phy0: ethernet-phy@0 {
 		reg = <0x00>;
