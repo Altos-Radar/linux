@@ -367,12 +367,16 @@ static void ti_csi2rx_fill_fmt(const struct ti_csi2rx_fmt *csi_fmt,
 			     MAX_WIDTH_BYTES * 8 / csi_fmt->bpp);
 	pix->height = clamp_t(unsigned int, pix->height, 1, MAX_HEIGHT_LINES);
 
-	/* Width should be a multiple of transfer word-size */
-	pix->width = rounddown(pix->width, pixels_in_word);
+	/* Set stride if not set */
+	if (!pix->bytesperline) {
+		pix->bytesperline = (pix->width * csi_fmt->bpp) / 8;
+	}
+
+	/* Stride should be a multiple of transfer word-size */
+	pix->bytesperline = (pix->bytesperline + PSIL_WORD_SIZE_BYTES - 1) & ~(PSIL_WORD_SIZE_BYTES - 1);
 
 	v4l2_fmt->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	pix->pixelformat = csi_fmt->fourcc;
-	pix->bytesperline = pix->width * (csi_fmt->bpp / 8);
 	pix->sizeimage = pix->bytesperline * pix->height;
 }
 
