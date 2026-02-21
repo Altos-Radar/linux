@@ -199,6 +199,7 @@ dtb-$(CONFIG_ARCH_K3) += k3-j722s-evm-v3link-fusion.dtbo
 dtb-$(CONFIG_ARCH_K3) += k3-j722s-edgeai-apps.dtbo
 dtb-$(CONFIG_ARCH_K3) += k3-j722s-altos-v3.dtb
 dtb-$(CONFIG_ARCH_K3) += k3-j722s-altos-v4.dtb
+dtb-$(CONFIG_ARCH_K3) += k3-j722s-altos-rcu-v1.dtb
 
 # Boards with J784s4 SoC
 dtb-$(CONFIG_ARCH_K3) += k3-am69-sk.dtb

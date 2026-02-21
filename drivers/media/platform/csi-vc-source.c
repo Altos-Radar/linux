@@ -91,13 +91,6 @@ static int csi_vc_init_state(struct v4l2_subdev *sd, struct v4l2_subdev_state *s
 			.source_stream = 0,
 			.flags = V4L2_SUBDEV_ROUTE_FL_ACTIVE,
 		},
-		{
-			.sink_pad = 2,
-			.sink_stream = 1,
-			.source_pad = 0,
-			.source_stream = 1,
-			.flags = V4L2_SUBDEV_ROUTE_FL_ACTIVE,
-		},
 	};
 	struct v4l2_subdev_krouting routing = {
 		.num_routes = ARRAY_SIZE(routes),
