@@ -1257,7 +1257,7 @@ static int max96717_set_tpg(struct max_ser *ser,
 }
 
 static const struct max_serdes_phys_config max96717_phys_configs[] = {
-	{ { 4 } },
+	{ { 4, 4 } },
 };
 
 static int max96717_init_tpg(struct max_ser *ser)
@@ -1650,6 +1650,15 @@ static const struct max96717_chip_info max9295a_info = {
 	.phy_hw_ids = { 1 },
 };
 
+static const struct max96717_chip_info max9295d_info = {
+	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE),
+	.num_pipes = 4,
+	.num_dts_per_pipe = 2,
+	.pipe_hw_ids = { 0, 1, 2, 3 },
+	.num_phys = 2,
+	.phy_hw_ids = { 0, 1 },
+};
+
 static const struct max96717_chip_info max96717_info = {
 	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE) |
 		 BIT(MAX_SERDES_GMSL_TUNNEL_MODE),
@@ -1665,6 +1674,7 @@ static const struct max96717_chip_info max96717_info = {
 
 static const struct of_device_id max96717_of_ids[] = {
 	{ .compatible = "maxim,max9295a", .data = &max9295a_info },
+	{ .compatible = "maxim,max9295d", .data = &max9295d_info },
 	{ .compatible = "maxim,max96717", .data = &max96717_info },
 	{ .compatible = "maxim,max96717f", .data = &max96717_info },
 	{ .compatible = "maxim,max96793", .data = &max96717_info },
