@@ -347,6 +347,8 @@ static const struct pinfunction max96717_functions[] = {
 
 static const struct pinconf_generic_params max96717_cfg_params[] = {
 	{ "maxim,jitter-compensation", MAX96717_PINCTRL_JITTER_COMPENSATION_EN, 0 },
+	{ "maxim,tx", MAX96717_PINCTRL_TX_EN, 1 },
+	{ "maxim,rx", MAX96717_PINCTRL_RX_EN, 1 },
 	{ "maxim,tx-id", MAX96717_PINCTRL_TX_ID, 0 },
 	{ "maxim,rx-id", MAX96717_PINCTRL_RX_ID, 0 },
 };

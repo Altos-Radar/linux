@@ -331,19 +331,17 @@ static const struct pinfunction max9296a_functions[] = {
 #define MAX9296A_PINCTRL_X(x) (PIN_CONFIG_END + x)
 #define MAX9296A_PINCTRL_PULL_STRENGTH_WEAK    MAX9296A_PINCTRL_X(1)
 #define MAX9296A_PINCTRL_JITTER_COMPENSATION_EN	 MAX9296A_PINCTRL_X(2)
-#define MAX9296A_PINCTRL_GMSL_TX_EN	     MAX9296A_PINCTRL_X(3)
-#define MAX9296A_PINCTRL_GMSL_RX_EN	     MAX9296A_PINCTRL_X(4)
-#define MAX9296A_PINCTRL_GMSL_TX_ID	     MAX9296A_PINCTRL_X(5)
-#define MAX9296A_PINCTRL_GMSL_RX_ID	     MAX9296A_PINCTRL_X(6)
+#define MAX9296A_PINCTRL_TX_EN	     MAX9296A_PINCTRL_X(3)
+#define MAX9296A_PINCTRL_RX_EN	     MAX9296A_PINCTRL_X(4)
+#define MAX9296A_PINCTRL_TX_ID	     MAX9296A_PINCTRL_X(5)
+#define MAX9296A_PINCTRL_RX_ID	     MAX9296A_PINCTRL_X(6)
 #define MAX9296A_PINCTRL_INPUT_VALUE	    MAX9296A_PINCTRL_X(7)
 
 static const struct pinconf_generic_params max9296a_cfg_params[] = {
 	{ "maxim,pull-strength-weak", MAX9296A_PINCTRL_PULL_STRENGTH_WEAK, 1 },
 	{ "maxim,jitter-compensation", MAX9296A_PINCTRL_JITTER_COMPENSATION_EN, 1 },
-	{ "maxim,tx", MAX9296A_PINCTRL_GMSL_TX_EN, 1 },
-	{ "maxim,rx", MAX9296A_PINCTRL_GMSL_RX_EN, 1 },
-	{ "maxim,tx-id", MAX9296A_PINCTRL_GMSL_TX_ID, 0 },
-	{ "maxim,rx-id", MAX9296A_PINCTRL_GMSL_RX_ID, 0 },
+	{ "maxim,tx-id", MAX9296A_PINCTRL_TX_ID, 0 },
+	{ "maxim,rx-id", MAX9296A_PINCTRL_RX_ID, 0 },
 };
 
 static int max9296a_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
@@ -381,11 +379,11 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = BIT(0);
 		*val = 0b1;
 		return 0;
-	case MAX9296A_PINCTRL_GMSL_TX_EN:
+	case MAX9296A_PINCTRL_TX_EN:
 		*mask = BIT(1);
 		*val = 0b1;
 		return 0;
-	case MAX9296A_PINCTRL_GMSL_RX_EN:
+	case MAX9296A_PINCTRL_RX_EN:
 		*mask = BIT(2);
 		*val = 0b1;
 		return 0;
@@ -405,7 +403,7 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = BIT(7);
 		*val = 0b0;
 		return 0;
-	case MAX9296A_PINCTRL_GMSL_TX_ID:
+	case MAX9296A_PINCTRL_TX_ID:
 		*reg += 1;
 		*mask = GENMASK(4, 0);
 		return 0;
@@ -451,7 +449,7 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 			return -EINVAL;
 		}
 		return 0;
-	case MAX9296A_PINCTRL_GMSL_RX_ID:
+	case MAX9296A_PINCTRL_RX_ID:
 		*reg += 2;
 		*mask = GENMASK(4, 0);
 		return 0;
@@ -483,15 +481,15 @@ static int max9296a_conf_pin_config_get(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			return ret;
 
-		val = field_get(ret, mask) == en_val;
+		val = field_get(mask, val) == en_val;
 		if (!val)
 			return -EINVAL;
 
 		break;
 	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN:
 	case MAX9296A_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX9296A_PINCTRL_GMSL_TX_EN:
-	case MAX9296A_PINCTRL_GMSL_RX_EN:
+	case MAX9296A_PINCTRL_TX_EN:
+	case MAX9296A_PINCTRL_RX_EN:
 	case MAX9296A_PINCTRL_INPUT_VALUE:
 	case PIN_CONFIG_OUTPUT_ENABLE:
 	case PIN_CONFIG_INPUT_ENABLE:
@@ -500,16 +498,16 @@ static int max9296a_conf_pin_config_get(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			return ret;
 
-		val = field_get(ret, mask) == en_val;
+		val = field_get(mask, val) == en_val;
 		break;
-	case MAX9296A_PINCTRL_GMSL_TX_ID:
-	case MAX9296A_PINCTRL_GMSL_RX_ID:
+	case MAX9296A_PINCTRL_TX_ID:
+	case MAX9296A_PINCTRL_RX_ID:
 	case PIN_CONFIG_SLEW_RATE:
 		ret = regmap_read(priv->regmap, reg, &val);
 		if (ret < 0)
 			return ret;
 
-		val = field_get(val, mask);
+		val = field_get(mask, val);
 		break;
 	default:
 		return -ENOTSUPP;
@@ -526,10 +524,10 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 {
 	u32 param = pinconf_to_config_param(config);
 	u32 arg = pinconf_to_config_argument(config);
-	unsigned int reg, mask, val;
+	unsigned int reg, mask, val, en_val;
 	int ret;
 
-	ret = max9296a_get_pin_config_reg(offset, param, &reg, &mask, &val);
+	ret = max9296a_get_pin_config_reg(offset, param, &reg, &mask, &en_val);
 	if (ret)
 		return ret;
 
@@ -539,25 +537,25 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 	case PIN_CONFIG_BIAS_DISABLE:
 	case PIN_CONFIG_BIAS_PULL_DOWN:
 	case PIN_CONFIG_BIAS_PULL_UP:
-		val = field_prep(val, mask);
+		val = field_prep(mask, en_val);
 
 		ret = regmap_update_bits(priv->regmap, reg, mask, val);
 		break;
 	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN:
 	case MAX9296A_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX9296A_PINCTRL_GMSL_TX_EN:
-	case MAX9296A_PINCTRL_GMSL_RX_EN:
+	case MAX9296A_PINCTRL_TX_EN:
+	case MAX9296A_PINCTRL_RX_EN:
 	case PIN_CONFIG_OUTPUT_ENABLE:
 	case PIN_CONFIG_INPUT_ENABLE:
 	case PIN_CONFIG_OUTPUT:
-		val = field_prep(arg ? val : ~val, mask);
+		val = field_prep(mask, arg ? en_val : ~en_val);
 
 		ret = regmap_update_bits(priv->regmap, reg, mask, val);
 		break;
-	case MAX9296A_PINCTRL_GMSL_TX_ID:
-	case MAX9296A_PINCTRL_GMSL_RX_ID:
+	case MAX9296A_PINCTRL_TX_ID:
+	case MAX9296A_PINCTRL_RX_ID:
 	case PIN_CONFIG_SLEW_RATE:
-		val = field_prep(arg, mask);
+		val = field_prep(mask, arg);
 
 		ret = regmap_update_bits(priv->regmap, reg, mask, val);
 		break;
@@ -573,7 +571,13 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 		config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 1);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
 	case PIN_CONFIG_OUTPUT_ENABLE:
-		config = pinconf_to_config_packed(MAX9296A_PINCTRL_GMSL_RX_EN, 0);
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN, 0);
+		return max9296a_conf_pin_config_set_one(priv, offset, config);
+	case MAX9296A_PINCTRL_TX_ID:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_TX_EN, 1);
+		return max9296a_conf_pin_config_set_one(priv, offset, config);
+	case MAX9296A_PINCTRL_RX_ID:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN, 1);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
 	default:
 		break;
