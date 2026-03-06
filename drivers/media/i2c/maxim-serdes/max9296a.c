@@ -317,11 +317,13 @@ MAX9296A_FUNC_GROUPS(gpio, "mfp0", "mfp1", "mfp2", "mfp3", "mfp4", "mfp5", "mfp6
 			   "mfp7", "mfp8", "mfp9", "mfp10", "mfp11", "mfp12");
 MAX9296A_FUNC_GROUPS(uart1, "mfp5", "mfp6");
 MAX9296A_FUNC_GROUPS(uart2, "mfp0", "mfp1");
+MAX9296A_FUNC_GROUPS(lock, "mfp1");
 
 enum max9692a_func {
 	max9296a_func_gpio,
 	max9296a_func_uart1,
 	max9296a_func_uart2,
+	max9296a_func_lock,
 };
 
 #define MAX9296A_FUNC(name)						\
@@ -332,6 +334,7 @@ static const struct pinfunction max9296a_functions[] = {
 	MAX9296A_FUNC(gpio),
 	MAX9296A_FUNC(uart1),
 	MAX9296A_FUNC(uart2),
+	MAX9296A_FUNC(lock),
 };
 
 #define MAX9296A_PINCTRL_X(x) (PIN_CONFIG_END + x)
@@ -648,12 +651,18 @@ static int max9296a_mux_set(struct pinctrl_dev *pctldev, unsigned selector,
 		} else if (group == 0 || group == 1) {
 			ret = regmap_update_bits(priv->regmap, 0x003, 0x20, 0x00);
 		}
+		if (group == 1) {
+			ret = regmap_update_bits(priv->regmap, 0x005, 0x80, 0x00);
+		}
 		break;
 	case max9296a_func_uart1:
 		ret = regmap_update_bits(priv->regmap, 0x003, 0x10, 0x10);
 		break;
 	case max9296a_func_uart2:
 		ret = regmap_update_bits(priv->regmap, 0x003, 0x20, 0x20);
+		break;
+	case max9296a_func_lock:
+		ret = regmap_update_bits(priv->regmap, 0x005, 0x80, 0x80);
 		break;
 	}
 	return ret;
