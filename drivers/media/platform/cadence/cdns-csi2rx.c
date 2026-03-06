@@ -301,41 +301,16 @@ static void csi2rx_reset(struct csi2rx_priv *csi2rx)
 
 static int csi2rx_configure_ext_dphy(struct csi2rx_priv *csi2rx)
 {
-	struct v4l2_ctrl_handler *handler = csi2rx->source_subdev->ctrl_handler;
+	struct media_pad *src_pad =
+		&csi2rx->source_subdev->entity.pads[csi2rx->source_pad];
 	union phy_configure_opts opts = { };
 	struct phy_configure_opts_mipi_dphy *cfg = &opts.mipi_dphy;
-	struct v4l2_mbus_framefmt *framefmt;
-	struct v4l2_subdev_state *state;
-	const struct csi2rx_fmt *fmt;
 	s64 link_freq;
 	int ret;
 
-	if (v4l2_ctrl_find(handler, V4L2_CID_LINK_FREQ)) {
-		link_freq = v4l2_get_link_freq(handler, 0, 0);
-	} else {
-		state = v4l2_subdev_get_locked_active_state(&csi2rx->subdev);
-		framefmt = v4l2_subdev_state_get_format(state, CSI2RX_PAD_SINK,
-							0);
-
-		if (framefmt) {
-			fmt = csi2rx_get_fmt_by_code(framefmt->code);
-		} else {
-			dev_err(csi2rx->dev,
-				"Did not find active sink format\n");
-			return -EINVAL;
-		}
-
-		link_freq = v4l2_get_link_freq(handler, fmt->bpp,
-					       2 * csi2rx->num_lanes);
-
-		dev_warn(csi2rx->dev,
-			 "Guessing link frequency using bitdepth of stream 0.\n");
-		dev_warn(csi2rx->dev,
-			 "V4L2_CID_LINK_FREQ control is required for multi format sources.\n");
-	}
-
+	link_freq = v4l2_get_link_freq(src_pad, 0, 0);
 	if (link_freq < 0) {
-		dev_err(csi2rx->dev, "Unable to calculate link frequency\n");
+		dev_err(csi2rx->dev, "Unable find link frequency\n");
 		return link_freq;
 	}
 
