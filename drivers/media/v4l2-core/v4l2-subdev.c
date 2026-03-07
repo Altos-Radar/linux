@@ -2310,7 +2310,7 @@ int v4l2_subdev_enable_streams(struct v4l2_subdev *sd, u32 pad,
 	}
 
 	if (ret) {
-		dev_dbg(dev, "enable streams %u:%#llx failed: %d\n", pad,
+		dev_dbg(dev, "enable streams (%s:%u):%#llx failed: %d\n", sd->entity.name, pad,
 			streams_mask, ret);
 		goto done;
 	}
