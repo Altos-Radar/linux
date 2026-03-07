@@ -6,6 +6,7 @@
 
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <media/mipi-csi2.h>
 #include <media/v4l2-async.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-mc.h>
@@ -49,9 +50,9 @@ static int csi_vc_get_frame_desc(struct v4l2_subdev *sd, unsigned int pad,
 		struct v4l2_mbus_frame_desc_entry *entry = &fd->entry[i];
 		entry->flags = 0;
 		entry->stream = i;
-		entry->pixelcode = MEDIA_BUS_FMT_UYVY8_1X16;
+		entry->pixelcode = MEDIA_BUS_FMT_Y8_1X8;
 		entry->bus.csi2.vc = i;
-		entry->bus.csi2.dt = 0;
+		entry->bus.csi2.dt = MIPI_CSI2_DT_RAW8;
 	}
 
 	return 0;
