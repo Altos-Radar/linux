@@ -146,17 +146,20 @@
 #define MAX96717_MIPI_RX1_CTRL_NUM_LANES	GENMASK(5, 4)
 
 #define MAX96717_MIPI_RX2			0x332
+#define MAX96717_MIPI_RX2_PHY0_LANE_MAP		GENMASK(3, 0)
 #define MAX96717_MIPI_RX2_PHY1_LANE_MAP		GENMASK(7, 4)
 
 #define MAX96717_MIPI_RX3			0x333
 #define MAX96717_MIPI_RX3_PHY2_LANE_MAP		GENMASK(3, 0)
+#define MAX96717_MIPI_RX3_PHY3_LANE_MAP		GENMASK(7, 4)
 
 #define MAX96717_MIPI_RX4			0x334
-#define MAX96717_MIPI_RX4_PHY1_POL_MAP		GENMASK(5, 4)
+#define MAX96717_MIPI_RX4_PHY0_POL_MAP		GENMASK(2, 0)
+#define MAX96717_MIPI_RX4_PHY1_POL_MAP		GENMASK(6, 4)
 
 #define MAX96717_MIPI_RX5			0x335
-#define MAX96717_MIPI_RX5_PHY2_POL_MAP		GENMASK(1, 0)
-#define MAX96717_MIPI_RX5_PHY2_POL_MAP_CLK	BIT(2)
+#define MAX96717_MIPI_RX5_PHY2_POL_MAP		GENMASK(2, 0)
+#define MAX96717_MIPI_RX5_PHY3_POL_MAP		GENMASK(6, 4)
 
 #define MAX96717_EXTA(x)			(0x3dc + (x))
 
@@ -203,6 +206,7 @@
 #define MAX96717_RCLK_MFP			4
 #define MAX96717_PIPES_NUM			4
 #define MAX96717_PHYS_NUM			2
+#define MAX96717_PHYS_PER_PORT			2
 
 struct max96717_priv {
 	struct max_ser ser;
@@ -229,6 +233,7 @@ struct max96717_chip_info {
 	unsigned int pipe_hw_ids[MAX96717_PIPES_NUM];
 	unsigned int num_phys;
 	unsigned int phy_hw_ids[MAX96717_PHYS_NUM];
+	unsigned int port_phy_map[MAX96717_PHYS_NUM][MAX96717_PHYS_PER_PORT];
 };
 
 #define ser_to_priv(_ser) \
@@ -931,6 +936,75 @@ static int max96717_log_phy_status(struct max_ser *ser,
 	return 0;
 }
 
+static int max96717_update_lane_map(struct max96717_priv *priv, unsigned int phy, unsigned int val)
+{
+	unsigned int reg;
+	unsigned int mask;
+	unsigned int field;
+
+	switch (phy) {
+	case 0:
+		reg = MAX96717_MIPI_RX2;
+		mask = MAX96717_MIPI_RX2_PHY0_LANE_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX2_PHY0_LANE_MAP, val);
+		break;
+	case 1:
+		reg = MAX96717_MIPI_RX2;
+		mask = MAX96717_MIPI_RX2_PHY1_LANE_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX2_PHY1_LANE_MAP, val);
+		break;
+	case 2:
+		reg = MAX96717_MIPI_RX3;
+		mask = MAX96717_MIPI_RX3_PHY2_LANE_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX3_PHY2_LANE_MAP, val);
+		break;
+	case 3:
+		reg = MAX96717_MIPI_RX3;
+		mask = MAX96717_MIPI_RX3_PHY3_LANE_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX3_PHY3_LANE_MAP, val);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return regmap_update_bits(priv->regmap, reg, mask, field);
+}
+
+static int max96717_update_lane_polarity(struct max96717_priv *priv,
+					 unsigned int phy, unsigned int val)
+{
+	unsigned int reg;
+	unsigned int mask;
+	unsigned int field;
+
+	switch (phy) {
+	case 0:
+		reg = MAX96717_MIPI_RX4;
+		mask = MAX96717_MIPI_RX4_PHY0_POL_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX4_PHY0_POL_MAP, val);
+		break;
+	case 1:
+		reg = MAX96717_MIPI_RX4;
+		mask = MAX96717_MIPI_RX4_PHY1_POL_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX4_PHY1_POL_MAP, val);
+		break;
+	case 2:
+		reg = MAX96717_MIPI_RX5;
+		mask = MAX96717_MIPI_RX5_PHY2_POL_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX5_PHY2_POL_MAP, val);
+		break;
+	case 3:
+		reg = MAX96717_MIPI_RX5;
+		mask = MAX96717_MIPI_RX5_PHY3_POL_MAP;
+		field = FIELD_PREP(MAX96717_MIPI_RX5_PHY3_POL_MAP, val);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return regmap_update_bits(priv->regmap, reg, mask, field);
+}
+
 static int max96717_init_phy(struct max_ser *ser,
 			     struct max_ser_phy *phy)
 {
@@ -974,15 +1048,11 @@ static int max96717_init_phy(struct max_ser *ser,
 		used_data_lanes |= BIT(map);
 	}
 
-	ret = regmap_update_bits(priv->regmap, MAX96717_MIPI_RX3,
-				 MAX96717_MIPI_RX3_PHY2_LANE_MAP,
-				 FIELD_PREP(MAX96717_MIPI_RX3_PHY2_LANE_MAP, val));
+	ret = max96717_update_lane_map(priv, priv->info->port_phy_map[phy->index][0], val & 0xF);
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(priv->regmap, MAX96717_MIPI_RX2,
-				 MAX96717_MIPI_RX2_PHY1_LANE_MAP,
-				 FIELD_PREP(MAX96717_MIPI_RX2_PHY1_LANE_MAP, val >> 4));
+	ret = max96717_update_lane_map(priv, priv->info->port_phy_map[phy->index][1], val >> 4);
 	if (ret)
 		return ret;
 
@@ -991,21 +1061,16 @@ static int max96717_init_phy(struct max_ser *ser,
 		if (phy->mipi.lane_polarities[i + 1])
 			val |= BIT(i);
 
-	ret = regmap_update_bits(priv->regmap, MAX96717_MIPI_RX5,
-				 MAX96717_MIPI_RX5_PHY2_POL_MAP,
-				 FIELD_PREP(MAX96717_MIPI_RX5_PHY2_POL_MAP, val));
+	ret = max96717_update_lane_polarity(priv,
+					    priv->info->port_phy_map[phy->index][0],
+					    (val & 0x3) |
+					    ((unsigned int)phy->mipi.lane_polarities[0] << 2));
 	if (ret)
 		return ret;
 
-	ret = regmap_update_bits(priv->regmap, MAX96717_MIPI_RX4,
-				 MAX96717_MIPI_RX4_PHY1_POL_MAP,
-				 FIELD_PREP(MAX96717_MIPI_RX4_PHY1_POL_MAP, val >> 2));
-	if (ret)
-		return ret;
-
-	ret = regmap_assign_bits(priv->regmap, MAX96717_MIPI_RX5,
-				 MAX96717_MIPI_RX5_PHY2_POL_MAP_CLK,
-				 phy->mipi.lane_polarities[0]);
+	ret = max96717_update_lane_polarity(priv,
+					    priv->info->port_phy_map[phy->index][1],
+					    val >> 2);
 	if (ret)
 		return ret;
 
@@ -1650,6 +1715,7 @@ static const struct max96717_chip_info max9295a_info = {
 	.pipe_hw_ids = { 0, 1, 2, 3 },
 	.num_phys = 1,
 	.phy_hw_ids = { 1 },
+	.port_phy_map = { { 2, 1 } },
 };
 
 static const struct max96717_chip_info max9295d_info = {
@@ -1659,6 +1725,7 @@ static const struct max96717_chip_info max9295d_info = {
 	.pipe_hw_ids = { 0, 1, 2, 3 },
 	.num_phys = 2,
 	.phy_hw_ids = { 0, 1 },
+	.port_phy_map = { { 1, 0 }, { 2, 3 } },
 };
 
 static const struct max96717_chip_info max96717_info = {
@@ -1672,6 +1739,7 @@ static const struct max96717_chip_info max96717_info = {
 	.pipe_hw_ids = { 2 },
 	.num_phys = 1,
 	.phy_hw_ids = { 1 },
+	.port_phy_map = { { 2, 1 } },
 };
 
 static const struct of_device_id max96717_of_ids[] = {
