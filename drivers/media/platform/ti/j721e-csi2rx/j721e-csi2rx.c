@@ -120,7 +120,7 @@ struct ti_csi2rx_dev {
 	unsigned int			enable_count;
 	unsigned int			num_ctx;
 	struct v4l2_device		v4l2_dev;
-	struct media_device		mdev;
+	struct media_device		*mdev;
 	struct media_pipeline		pipe;
 	struct media_pad		pads[TI_CSI2RX_MAX_PADS];
 	struct v4l2_async_notifier	notifier;
@@ -1316,9 +1316,11 @@ static const struct v4l2_subdev_internal_ops ti_csi2rx_internal_ops = {
 static void ti_csi2rx_cleanup_v4l2(struct ti_csi2rx_dev *csi)
 {
 	v4l2_subdev_cleanup(&csi->subdev);
-	media_device_unregister(&csi->mdev);
+	if (csi->mdev)
+		media_device_unregister(csi->mdev);
 	v4l2_device_unregister(&csi->v4l2_dev);
-	media_device_cleanup(&csi->mdev);
+	if (csi->mdev)
+		media_device_cleanup(csi->mdev);
 }
 
 static void ti_csi2rx_cleanup_notifier(struct ti_csi2rx_dev *csi)
@@ -1459,27 +1461,33 @@ static int ti_csi2rx_init_dma(struct ti_csi2rx_ctx *ctx)
 	return 0;
 }
 
-static int ti_csi2rx_v4l2_init(struct ti_csi2rx_dev *csi)
+static int ti_csi2rx_v4l2_init(struct ti_csi2rx_dev *csi, struct media_device *mdev)
 {
-	struct media_device *mdev = &csi->mdev;
 	struct v4l2_subdev *sd = &csi->subdev;
 	int ret;
 
-	mdev->dev = csi->dev;
-	mdev->hw_revision = 1;
-	strscpy(mdev->model, "TI-CSI2RX", sizeof(mdev->model));
+	if (!mdev) {
+		csi->mdev = mdev = devm_kzalloc(csi->dev, sizeof(*mdev), GFP_KERNEL);
+		if (!mdev)
+			return -ENOMEM;
 
-	media_device_init(mdev);
+		mdev->dev = csi->dev;
+		mdev->hw_revision = 1;
+		strscpy(mdev->model, "TI-CSI2RX", sizeof(mdev->model));
 
+		media_device_init(mdev);
+	}
 	csi->v4l2_dev.mdev = mdev;
 
 	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
 	if (ret)
 		goto cleanup_media;
 
-	ret = media_device_register(mdev);
-	if (ret)
-		goto unregister_v4l2;
+	if (csi->mdev) {
+		ret = media_device_register(mdev);
+		if (ret)
+			goto unregister_v4l2;
+	}
 
 	v4l2_subdev_init(sd, &ti_csi2rx_subdev_ops);
 	sd->internal_ops = &ti_csi2rx_internal_ops;
@@ -1514,11 +1522,13 @@ static int ti_csi2rx_v4l2_init(struct ti_csi2rx_dev *csi)
 cleanup_subdev:
 	v4l2_subdev_cleanup(sd);
 unregister_media:
-	media_device_unregister(mdev);
+	if (csi->mdev)
+		media_device_unregister(mdev);
 unregister_v4l2:
 	v4l2_device_unregister(&csi->v4l2_dev);
 cleanup_media:
-	media_device_cleanup(mdev);
+	if (csi->mdev)
+		media_device_cleanup(mdev);
 
 	return ret;
 }
@@ -1741,6 +1751,8 @@ static const struct dev_pm_ops ti_csi2rx_pm_ops = {
 static int ti_csi2rx_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
+	struct device_node *primary_np;
+	struct media_device *mdev = NULL;
 	struct ti_csi2rx_dev *csi;
 	int ret, i, count;
 
@@ -1764,6 +1776,28 @@ static int ti_csi2rx_probe(struct platform_device *pdev)
 	if (!csi->drain.vaddr)
 		return -ENOMEM;
 
+	primary_np = of_parse_phandle(np, "ti,bond", 0);
+	if (primary_np && of_device_is_available(primary_np)) {
+		struct platform_device *primary_pdev = of_find_device_by_node(primary_np);
+		struct ti_csi2rx_dev *primary_csi;
+		if (!primary_pdev) {
+			dev_err(csi->dev, "Failed to get bonded device from node\n");
+			return -ENODEV;
+		}
+
+		device_lock(&primary_pdev->dev);
+		primary_csi = platform_get_drvdata(primary_pdev);
+		if (primary_csi)
+			mdev = primary_csi->mdev;
+		device_unlock(&primary_pdev->dev);
+		put_device(&primary_pdev->dev);
+
+		if (!primary_csi) {
+			dev_info(csi->dev, "Probe deferred - waiting for primary CSI\n");
+			return -EPROBE_DEFER;
+		}
+	}
+
 	/* Only use as many contexts as the number of DMA channels allocated. */
 	count = of_property_count_strings(np, "dma-names");
 	if (count < 0) {
@@ -1782,7 +1816,7 @@ static int ti_csi2rx_probe(struct platform_device *pdev)
 
 	mutex_init(&csi->mutex);
 
-	ret = ti_csi2rx_v4l2_init(csi);
+	ret = ti_csi2rx_v4l2_init(csi, mdev);
 	if (ret)
 		goto err_v4l2;
 

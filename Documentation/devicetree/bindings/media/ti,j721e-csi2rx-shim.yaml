@@ -67,6 +67,11 @@ properties:
 
   ranges: true
 
+  ti,bond:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: |
+      Share a media device with another ti csi2rx device.
+
   "#address-cells": true
 
   "#size-cells": true
