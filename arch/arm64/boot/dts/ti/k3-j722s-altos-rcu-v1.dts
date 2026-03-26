@@ -25,7 +25,7 @@
 		compatible = "csi-vc";
 		port {
 			csi1_vc0_ep: endpoint {
-				remote-endpoint = <&rf_ser1_c_ep>;
+				remote-endpoint = <&rf_ser1_d_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
 			};
@@ -36,7 +36,7 @@
 		compatible = "csi-vc";
 		port {
 			csi2_vc0_ep: endpoint {
-				remote-endpoint = <&rf_ser1_e_ep>;
+				remote-endpoint = <&rf_ser2_b_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
 			};
@@ -47,35 +47,12 @@
 		compatible = "csi-vc";
 		port {
 			csi3_vc0_ep: endpoint {
-				remote-endpoint = <&rf_ser1_f_ep>;
+				remote-endpoint = <&rf_ser2_d_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
 			};
 		};
 	};
-
-	csi_vc4: csi-vc4 {
-		compatible = "csi-vc";
-		port {
-			csi4_vc0_ep: endpoint {
-				remote-endpoint = <&rf_ser2_b_ep>;
-				clock-lanes = <0>;
-				data-lanes = <1 2 3 4>;
-			};
-		};
-	};
-
-	csi_vc6: csi-vc6 {
-		compatible = "csi-vc";
-		port {
-			csi6_vc0_ep: endpoint {
-				remote-endpoint = <&rf_ser2_e_ep>;
-				clock-lanes = <0>;
-				data-lanes = <1 2 3 4>;
-			};
-		};
-	};
-
 };
 
 &main_pmx0 {
@@ -159,35 +136,27 @@
 	clock-frequency = <400000>;
 
 	gmsl-deserializer@28 {
-		#address-cells = <1>;
-		#size-cells = <0>;
 		compatible = "maxim,max96716a";
 		reg = <0x28>;
 		powerdown-gpios = <&main_gpio1 18 GPIO_ACTIVE_LOW>;
+		vdd-supply = <&vsys_io_1v2>;
 
 		i2c-alias-pool = <0x41 0x42>;
 		pinctrl-names = "default";
 		pinctrl-0 =
-			<&des1_mfp0>,
 			<&des1_mfp1>,
 			<&des1_mfp2>,
-			<&des1_mfp3>;
+			<&des1_mfp3>,
+			<&des1_mfp4>,
+			<&des1_mfp8>;
 
-		des1_mfp0: des1-mfp0 {
-			pins = "mfp0";
-			function = "gpio";
-			drive-push-pull;
-			output-enable;
-			bias-disable;
-			maxim,rx-id = <20>;
-		};
 		des1_mfp1: des1-mfp1 {
 			pins = "mfp1";
 			function = "gpio";
 			drive-push-pull;
 			output-enable;
 			bias-disable;
-			maxim,rx-id = <18>;
+			maxim,rx-id-a = <18>;
 		};
 		des1_mfp2: des1-mfp2 {
 			pins = "mfp2";
@@ -195,7 +164,7 @@
 			drive-push-pull;
 			output-enable;
 			bias-disable;
-			maxim,rx-id = <19>;
+			maxim,rx-id-b = <20>;
 		};
 		des1_mfp3: des1-mfp3 {
 			pins = "mfp3";
@@ -203,7 +172,26 @@
 			drive-push-pull;
 			output-enable;
 			bias-disable;
-			maxim,rx-id = <17>;
+			maxim,rx-id-a = <17>;
+		};
+		des1_mfp4: des1-mfp4 {
+			pins = "mfp4";
+			function = "gpio";
+			drive-push-pull;
+			output-enable;
+			bias-disable;
+			maxim,rx-id-b = <19>;
+		};
+		des1_mfp8: des1-mfp8 {
+			pins = "mfp8";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <16>;
+			maxim,tx-id-b = <16>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
 		};
 
 		ports {
@@ -218,7 +206,7 @@
 			port@1 {
 				reg = <1>;
 				des1_coax_b_ep: endpoint {
-					remote-endpoint = <&rf_ser1_d_ep>;
+					remote-endpoint = <&rf_ser1_c_ep>;
 				};
 			};
 			port@2 {
@@ -251,31 +239,39 @@
 				reg = <0>;
 
 				rf_ser1_a: gmsl-serializer@40 {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					compatible = "maxim,max9295d";
+					compatible = "maxim,max96717";
 					reg = <0x40>;
 
-					i2c-alias-pool = <0x43>;
+					i2c-alias-pool = <0x51 0x52>;
 
 					gpio-controller;
 					#gpio-cells = <2>;
 					gpio-ranges = <&rf_ser1_a 0 0 11>;
 
 					pinctrl-names = "default";
-					pinctrl-0 = <&ser1_a_mfp8>, <&ser1_a_mfp9>;
+					pinctrl-0 =
+						<&ser1_a_mfp3>,
+						<&ser1_a_mfp5>,
+						<&ser1_a_mfp6>;
 
-					ser1_a_mfp8: ser1-mfp8 {
-						pins = "mfp8";
+					ser1_a_mfp3: ser1-mfp3 {
+						pins = "mfp3";
+						function = "gpio";
+						drive-push-pull;
+						output-enable;
+						bias-disable;
+						maxim,rx-id = <16>;
+					};
+					ser1_a_mfp5: ser1-mfp5 {
+						pins = "mfp5";
 						function = "gpio";
 						bias-disable;
 						output-disable;
 						input-enable;
 						maxim,tx-id = <17>;
 					};
-
-					ser1_a_mfp9: ser1-mfp9 {
-						pins = "mfp9";
+					ser1_a_mfp6: ser1-mfp6 {
+						pins = "mfp6";
 						function = "gpio";
 						bias-disable;
 						output-disable;
@@ -296,15 +292,27 @@
 						};
 						port@1 {
 							reg = <1>;
-							rf_ser1_c_ep: endpoint {
-								remote-endpoint = <&csi1_vc0_ep>;
-								data-lanes = <1 2 3 4>;
-							};
-						};
-						port@2 {
-							reg = <2>;
 							rf_ser1_a_ep: endpoint {
 								remote-endpoint = <&des1_coax_a_ep>;
+							};
+						};
+					};
+
+					i2c-atr {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+							dummy@60 {
+								compatible = "dummy";
+								reg = <0x60>;
+							};
+							dummy@50 {
+								compatible = "dummy";
+								reg = <0x50>;
 							};
 						};
 					};
@@ -315,23 +323,32 @@
 				#size-cells = <0>;
 				reg = <1>;
 
-				rf_ser1_b: gmsl-serializer@62 {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					compatible = "maxim,max9295d";
-					reg = <0x62>;
+				rf_ser1_b: gmsl-serializer@40 {
+					compatible = "maxim,max96717";
+					reg = <0x40>;
 
-					i2c-alias-pool = <0x43>;
+					i2c-alias-pool = <0x61 0x62>;
 
 					gpio-controller;
 					#gpio-cells = <2>;
 					gpio-ranges = <&rf_ser1_b 0 0 11>;
 
 					pinctrl-names = "default";
-					pinctrl-0 = <&ser1_b_mfp8>, <&ser1_b_mfp9>;
+					pinctrl-0 =
+						<&ser1_b_mfp3>,
+						<&ser1_b_mfp5>,
+						<&ser1_b_mfp6>;
 
-					ser1_b_mfp8: ser1-mfp8 {
-						pins = "mfp8";
+					ser1_b_mfp3: ser1-mfp3 {
+						pins = "mfp3";
+						function = "gpio";
+						drive-push-pull;
+						output-enable;
+						bias-disable;
+						maxim,rx-id = <16>;
+					};
+					ser1_b_mfp5: ser1-mfp5 {
+						pins = "mfp5";
 						function = "gpio";
 						bias-disable;
 						output-disable;
@@ -339,8 +356,8 @@
 						maxim,tx-id = <19>;
 					};
 
-					ser1_b_mfp9: ser1-mfp9 {
-						pins = "mfp9";
+					ser1_b_mfp6: ser1-mfp6 {
+						pins = "mfp6";
 						function = "gpio";
 						bias-disable;
 						output-disable;
@@ -354,22 +371,34 @@
 
 						port@0 {
 							reg = <0>;
-							rf_ser1_e_ep: endpoint {
-								remote-endpoint = <&csi2_vc0_ep>;
+							rf_ser1_d_ep: endpoint {
+								remote-endpoint = <&csi1_vc0_ep>;
 								data-lanes = <1 2 3 4>;
 							};
 						};
 						port@1 {
 							reg = <1>;
-							rf_ser1_f_ep: endpoint {
-								remote-endpoint = <&csi3_vc0_ep>;
-								data-lanes = <1 2 3 4>;
+							rf_ser1_c_ep: endpoint {
+								remote-endpoint = <&des1_coax_b_ep>;
 							};
 						};
-						port@2 {
-							reg = <2>;
-							rf_ser1_d_ep: endpoint {
-								remote-endpoint = <&des1_coax_b_ep>;
+					};
+
+					i2c-atr {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+							dummy@60 {
+								compatible = "dummy";
+								reg = <0x60>;
+							};
+							dummy@50 {
+								compatible = "dummy";
+								reg = <0x50>;
 							};
 						};
 					};
@@ -382,19 +411,67 @@
 &main_i2c1 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&main_i2c1_pins_default>;
+	pinctrl-0 = <&main_i2c1_pins_default>, <&serdes2_pins_default>, <&mcu_serdes2_pins_default>;
 	clock-frequency = <400000>;
 
 	gmsl-deserializer@28 {
-		#address-cells = <1>;
-		#size-cells = <0>;
 		compatible = "maxim,max96716a";
 		reg = <0x28>;
 		powerdown-gpios = <&main_gpio1 19 GPIO_ACTIVE_LOW>;
+		vdd-supply = <&vsys_io_1v2>;
 
 		i2c-alias-pool = <0x41 0x42>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&serdes2_pins_default>, <&mcu_serdes2_pins_default>;
+		pinctrl-0 =
+			<&des2_mfp1>,
+			<&des2_mfp2>,
+			<&des2_mfp3>,
+			<&des2_mfp4>,
+			<&des2_mfp8>;
+
+		des2_mfp1: des2-mfp1 {
+			pins = "mfp1";
+			function = "gpio";
+			drive-push-pull;
+			output-enable;
+			bias-disable;
+			maxim,rx-id-a = <18>;
+		};
+		des2_mfp2: des2-mfp2 {
+			pins = "mfp2";
+			function = "gpio";
+			drive-push-pull;
+			output-enable;
+			bias-disable;
+			maxim,rx-id-b = <20>;
+		};
+		des2_mfp3: des2-mfp3 {
+			pins = "mfp3";
+			function = "gpio";
+			drive-push-pull;
+			output-enable;
+			bias-disable;
+			maxim,rx-id-a = <17>;
+		};
+		des2_mfp4: des2-mfp4 {
+			pins = "mfp4";
+			function = "gpio";
+			drive-push-pull;
+			output-enable;
+			bias-disable;
+			maxim,rx-id-b = <19>;
+		};
+		des2_mfp8: des2-mfp8 {
+			pins = "mfp8";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <16>;
+			maxim,tx-id-b = <16>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
+		};
 
 		ports {
 			#address-cells = <1>;
@@ -408,7 +485,7 @@
 			port@1 {
 				reg = <1>;
 				des2_coax_b_ep: endpoint {
-					remote-endpoint = <&rf_ser2_d_ep>;
+					remote-endpoint = <&rf_ser2_c_ep>;
 				};
 			};
 			port@2 {
@@ -441,20 +518,26 @@
 				reg = <0>;
 
 				rf_ser2_a: gmsl-serializer@40 {
-					#address-cells = <1>;
-					#size-cells = <0>;
 					compatible = "maxim,max96717";
 					reg = <0x40>;
 
-					i2c-alias-pool = <0x43>;
+					i2c-alias-pool = <0x51 0x52>;
 
 					gpio-controller;
 					#gpio-cells = <2>;
 					gpio-ranges = <&rf_ser2_a 0 0 11>;
 
 					pinctrl-names = "default";
-					pinctrl-0 = <&ser2_a_mfp5>, <&ser2_a_mfp6>;
+					pinctrl-0 = <&ser2_a_mfp3>, <&ser2_a_mfp5>, <&ser2_a_mfp6>;
 
+					ser2_a_mfp3: ser2-mfp3 {
+						pins = "mfp3";
+						function = "gpio";
+						drive-push-pull;
+						output-enable;
+						bias-disable;
+						maxim,rx-id = <16>;
+					};
 					ser2_a_mfp5: ser2-mfp5 {
 						pins = "mfp5";
 						function = "gpio";
@@ -463,7 +546,6 @@
 						input-enable;
 						maxim,tx-id = <17>;
 					};
-
 					ser2_a_mfp6: ser2-mfp6 {
 						pins = "mfp6";
 						function = "gpio";
@@ -480,7 +562,7 @@
 						port@0 {
 							reg = <0>;
 							rf_ser2_b_ep: endpoint {
-								remote-endpoint = <&csi4_vc0_ep>;
+								remote-endpoint = <&csi2_vc0_ep>;
 								data-lanes = <1 2 3 4>;
 							};
 						};
@@ -488,6 +570,25 @@
 							reg = <1>;
 							rf_ser2_a_ep: endpoint {
 								remote-endpoint = <&des2_coax_a_ep>;
+							};
+						};
+					};
+
+					i2c-atr {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+							dummy@60 {
+								compatible = "dummy";
+								reg = <0x60>;
+							};
+							dummy@50 {
+								compatible = "dummy";
+								reg = <0x50>;
 							};
 						};
 					};
@@ -499,36 +600,41 @@
 				reg = <1>;
 
 				rf_ser2_b: gmsl-serializer@40 {
-					#address-cells = <1>;
-					#size-cells = <0>;
 					compatible = "maxim,max96717";
 					reg = <0x40>;
 
-					i2c-alias-pool = <0x44>;
+					i2c-alias-pool = <0x61 0x62>;
 
 					gpio-controller;
 					#gpio-cells = <2>;
 					gpio-ranges = <&rf_ser2_b 0 0 11>;
 
 					pinctrl-names = "default";
-					pinctrl-0 = <&ser2_b_mfp5>, <&ser2_b_mfp6>;
+					pinctrl-0 = <&ser2_b_mfp3>, <&ser2_b_mfp5>, <&ser2_b_mfp6>;
 
+					ser2_b_mfp3: ser2-mfp3 {
+						pins = "mfp3";
+						function = "gpio";
+						drive-push-pull;
+						output-enable;
+						bias-disable;
+						maxim,rx-id = <16>;
+					};
 					ser2_b_mfp5: ser2-mfp5 {
 						pins = "mfp5";
 						function = "gpio";
 						bias-disable;
 						output-disable;
 						input-enable;
-						maxim,tx-id = <17>;
+						maxim,tx-id = <19>;
 					};
-
 					ser2_b_mfp6: ser2-mfp6 {
 						pins = "mfp6";
 						function = "gpio";
 						bias-disable;
 						output-disable;
 						input-enable;
-						maxim,tx-id = <18>;
+						maxim,tx-id = <20>;
 					};
 
 					ports {
@@ -537,15 +643,34 @@
 
 						port@0 {
 							reg = <0>;
-							rf_ser2_e_ep: endpoint {
-								remote-endpoint = <&csi6_vc0_ep>;
+							rf_ser2_d_ep: endpoint {
+								remote-endpoint = <&csi3_vc0_ep>;
 								data-lanes = <1 2 3 4>;
 							};
 						};
 						port@1 {
 							reg = <1>;
-							rf_ser2_d_ep: endpoint {
+							rf_ser2_c_ep: endpoint {
 								remote-endpoint = <&des2_coax_b_ep>;
+							};
+						};
+					};
+
+					i2c-atr {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						i2c@0 {
+							#address-cells = <1>;
+							#size-cells = <0>;
+							reg = <0>;
+							dummy@60 {
+								compatible = "dummy";
+								reg = <0x60>;
+							};
+							dummy@50 {
+								compatible = "dummy";
+								reg = <0x50>;
 							};
 						};
 					};
