@@ -240,14 +240,19 @@ v4l2_async_find_subdev_notifier(struct v4l2_subdev *sd)
 	return NULL;
 }
 
-/* Get v4l2_device related to the notifier if one can be found. */
+/* Get v4l2_device related to the notifier if one can be found.
+ * This is only used so __v4l2_device_register_subdev can module_get
+ * on the driver owner.
+ */
 static struct v4l2_device *
 v4l2_async_nf_find_v4l2_dev(struct v4l2_async_notifier *notifier)
 {
-	while (notifier->parent)
-		notifier = notifier->parent;
+	if (notifier->v4l2_dev)
+		return notifier->v4l2_dev;
+	else
+		return notifier->sd->v4l2_dev;
 
-	return notifier->v4l2_dev;
+	return NULL;
 }
 
 /*
@@ -290,20 +295,17 @@ v4l2_async_nf_try_complete(struct v4l2_async_notifier *notifier)
 		dev_dbg(notifier_dev(notifier),
 			"v4l2-async: trying to complete\n");
 
-	/* Check the entire notifier tree; find the root notifier first. */
-	while (notifier->parent)
-		notifier = notifier->parent;
+	/* Check the entire notifier tree; find the root notifiers. */
+	list_for_each_entry(notifier, &notifier->graph_entry, graph_entry) {
+		/* This is a root if it has v4l2_dev. */
+		if (!notifier->v4l2_dev) {
+			continue;
+		}
 
-	/* This is root if it has v4l2_dev. */
-	if (!notifier->v4l2_dev) {
-		dev_dbg(notifier_dev(__notifier),
-			"v4l2-async: V4L2 device not available\n");
-		return 0;
+		/* Is everything ready? */
+		if (!v4l2_async_nf_can_complete(notifier))
+			return 0;
 	}
-
-	/* Is everything ready? */
-	if (!v4l2_async_nf_can_complete(notifier))
-		return 0;
 
 	dev_dbg(notifier_dev(__notifier), "v4l2-async: complete\n");
 
@@ -393,7 +395,7 @@ static int v4l2_async_match_notify(struct v4l2_async_notifier *notifier,
 	 * See if the sub-device has a notifier. If not, return here.
 	 */
 	subdev_notifier = v4l2_async_find_subdev_notifier(sd);
-	if (!subdev_notifier || subdev_notifier->parent)
+	if (!subdev_notifier || !list_empty(&subdev_notifier->graph_entry))
 		return 0;
 
 	/*
@@ -401,7 +403,9 @@ static int v4l2_async_match_notify(struct v4l2_async_notifier *notifier,
 	 * sub-devices, and return the result. The error will be handled by the
 	 * caller.
 	 */
-	subdev_notifier->parent = notifier;
+	if (!list_empty(&subdev_notifier->graph_entry))
+		list_splice_init(&subdev_notifier->graph_entry, &notifier->graph_entry);
+	list_add(&subdev_notifier->graph_entry, &notifier->graph_entry);
 
 	return v4l2_async_nf_try_all_subdevs(subdev_notifier);
 
@@ -486,7 +490,7 @@ v4l2_async_nf_unbind_all_subdevs(struct v4l2_async_notifier *notifier)
 		v4l2_async_unbind_subdev_one(notifier, asc);
 	}
 
-	notifier->parent = NULL;
+	list_del(&notifier->graph_entry);
 }
 
 /* See if an async sub-device can be found in a notifier's lists. */
@@ -571,6 +575,7 @@ void v4l2_async_nf_init(struct v4l2_async_notifier *notifier,
 	INIT_LIST_HEAD(&notifier->waiting_list);
 	INIT_LIST_HEAD(&notifier->done_list);
 	INIT_LIST_HEAD(&notifier->notifier_entry);
+	INIT_LIST_HEAD(&notifier->graph_entry);
 	notifier->v4l2_dev = v4l2_dev;
 }
 EXPORT_SYMBOL(v4l2_async_nf_init);
@@ -581,6 +586,7 @@ void v4l2_async_subdev_nf_init(struct v4l2_async_notifier *notifier,
 	INIT_LIST_HEAD(&notifier->waiting_list);
 	INIT_LIST_HEAD(&notifier->done_list);
 	INIT_LIST_HEAD(&notifier->notifier_entry);
+	INIT_LIST_HEAD(&notifier->graph_entry);
 	notifier->sd = sd;
 }
 EXPORT_SYMBOL_GPL(v4l2_async_subdev_nf_init);
@@ -643,6 +649,7 @@ __v4l2_async_nf_unregister(struct v4l2_async_notifier *notifier)
 	v4l2_async_nf_unbind_all_subdevs(notifier);
 
 	list_del_init(&notifier->notifier_entry);
+	list_del_init(&notifier->graph_entry);
 }
 
 void v4l2_async_nf_unregister(struct v4l2_async_notifier *notifier)

@@ -109,20 +109,20 @@ struct v4l2_async_notifier_operations {
  * @ops:	notifier operations
  * @v4l2_dev:	v4l2_device of the root notifier, NULL otherwise
  * @sd:		sub-device that registered the notifier, NULL otherwise
- * @parent:	parent notifier
  * @waiting_list: list of struct v4l2_async_connection, waiting for their
  *		  drivers
  * @done_list:	list of struct v4l2_subdev, already probed
  * @notifier_entry: member in a global list of notifiers
+ * @graph_entry: member in a connected media graph
  */
 struct v4l2_async_notifier {
 	const struct v4l2_async_notifier_operations *ops;
 	struct v4l2_device *v4l2_dev;
 	struct v4l2_subdev *sd;
-	struct v4l2_async_notifier *parent;
 	struct list_head waiting_list;
 	struct list_head done_list;
 	struct list_head notifier_entry;
+	struct list_head graph_entry;
 };
 
 /**
