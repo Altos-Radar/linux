@@ -1729,8 +1729,7 @@ static const struct max96717_chip_info max9295d_info = {
 };
 
 static const struct max96717_chip_info max96717_info = {
-	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE) |
-		 BIT(MAX_SERDES_GMSL_TUNNEL_MODE),
+	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE),
 	.supports_3_data_lanes = true,
 	.supports_pkt_cnt = true,
 	.supports_noncontinuous_clock = true,
