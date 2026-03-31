@@ -542,7 +542,7 @@ static int cdns_dsi_check_conf(struct cdns_dsi *dsi,
 	if (ret)
 		return ret;
 
-	if (req_hs_clk_rate != output->phy_opts.mipi_dphy.hs_clk_rate) {
+	if (req_hs_clk_rate && req_hs_clk_rate != output->phy_opts.mipi_dphy.hs_clk_rate) {
 		dev_err(&dsi->dphy->dev,
 			"validation changed hs_clk_rate from %lu to %lu, diff %lu\n",
 			req_hs_clk_rate, output->phy_opts.mipi_dphy.hs_clk_rate,
