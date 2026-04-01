@@ -342,18 +342,26 @@ static const struct pinfunction max9296a_functions[] = {
 
 #define MAX9296A_PINCTRL_X(x) (PIN_CONFIG_END + x)
 #define MAX9296A_PINCTRL_PULL_STRENGTH_WEAK    MAX9296A_PINCTRL_X(1)
-#define MAX9296A_PINCTRL_JITTER_COMPENSATION_EN	 MAX9296A_PINCTRL_X(2)
-#define MAX9296A_PINCTRL_TX_EN	     MAX9296A_PINCTRL_X(3)
-#define MAX9296A_PINCTRL_RX_EN	     MAX9296A_PINCTRL_X(4)
-#define MAX9296A_PINCTRL_TX_ID	     MAX9296A_PINCTRL_X(5)
-#define MAX9296A_PINCTRL_RX_ID	     MAX9296A_PINCTRL_X(6)
-#define MAX9296A_PINCTRL_INPUT_VALUE	    MAX9296A_PINCTRL_X(7)
+#define MAX9296A_PINCTRL_INPUT_VALUE	    MAX9296A_PINCTRL_X(2)
+#define MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_A	 MAX9296A_PINCTRL_X(3)
+#define MAX9296A_PINCTRL_TX_EN_A	     MAX9296A_PINCTRL_X(4)
+#define MAX9296A_PINCTRL_RX_EN_A	     MAX9296A_PINCTRL_X(5)
+#define MAX9296A_PINCTRL_TX_ID_A	     MAX9296A_PINCTRL_X(6)
+#define MAX9296A_PINCTRL_RX_ID_A	     MAX9296A_PINCTRL_X(7)
+#define MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_B	 MAX9296A_PINCTRL_X(8)
+#define MAX9296A_PINCTRL_TX_EN_B	     MAX9296A_PINCTRL_X(9)
+#define MAX9296A_PINCTRL_RX_EN_B	     MAX9296A_PINCTRL_X(10)
+#define MAX9296A_PINCTRL_TX_ID_B	     MAX9296A_PINCTRL_X(11)
+#define MAX9296A_PINCTRL_RX_ID_B	     MAX9296A_PINCTRL_X(12)
 
 static const struct pinconf_generic_params max9296a_cfg_params[] = {
 	{ "maxim,pull-strength-weak", MAX9296A_PINCTRL_PULL_STRENGTH_WEAK, 1 },
-	{ "maxim,jitter-compensation", MAX9296A_PINCTRL_JITTER_COMPENSATION_EN, 1 },
-	{ "maxim,tx-id", MAX9296A_PINCTRL_TX_ID, 0 },
-	{ "maxim,rx-id", MAX9296A_PINCTRL_RX_ID, 0 },
+	{ "maxim,jitter-compensation-a", MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_A, 1 },
+	{ "maxim,tx-id-a", MAX9296A_PINCTRL_TX_ID_A, 0 },
+	{ "maxim,rx-id-a", MAX9296A_PINCTRL_RX_ID_A, 0 },
+	{ "maxim,jitter-compensation-b", MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_B, 1 },
+	{ "maxim,tx-id-b", MAX9296A_PINCTRL_TX_ID_B, 0 },
+	{ "maxim,rx-id-b", MAX9296A_PINCTRL_RX_ID_B, 0 },
 };
 
 static int max9296a_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
@@ -381,6 +389,8 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 				       unsigned int *val)
 {
 	*reg = 0x2b0 + offset * 0x3;
+	if (param >= MAX9296A_PINCTRL_TX_EN_B)
+		*reg += 0x5000;
 
 	switch (param) {
 	case PIN_CONFIG_OUTPUT_ENABLE:
@@ -391,11 +401,13 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = BIT(0);
 		*val = 0b1;
 		return 0;
-	case MAX9296A_PINCTRL_TX_EN:
+	case MAX9296A_PINCTRL_TX_EN_A:
+	case MAX9296A_PINCTRL_TX_EN_B:
 		*mask = BIT(1);
 		*val = 0b1;
 		return 0;
-	case MAX9296A_PINCTRL_RX_EN:
+	case MAX9296A_PINCTRL_RX_EN_A:
+	case MAX9296A_PINCTRL_RX_EN_B:
 		*mask = BIT(2);
 		*val = 0b1;
 		return 0;
@@ -407,7 +419,8 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = BIT(4);
 		*val = 0b1;
 		return 0;
-	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_A:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_B:
 		*mask = BIT(5);
 		*val = 0b1;
 		return 0;
@@ -415,7 +428,8 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 		*mask = BIT(7);
 		*val = 0b0;
 		return 0;
-	case MAX9296A_PINCTRL_TX_ID:
+	case MAX9296A_PINCTRL_TX_ID_A:
+	case MAX9296A_PINCTRL_TX_ID_B:
 		*reg += 1;
 		*mask = GENMASK(4, 0);
 		return 0;
@@ -461,7 +475,8 @@ static int max9296a_get_pin_config_reg(unsigned int offset, u32 param,
 			return -EINVAL;
 		}
 		return 0;
-	case MAX9296A_PINCTRL_RX_ID:
+	case MAX9296A_PINCTRL_RX_ID_A:
+	case MAX9296A_PINCTRL_RX_ID_B:
 		*reg += 2;
 		*mask = GENMASK(4, 0);
 		return 0;
@@ -498,11 +513,14 @@ static int max9296a_conf_pin_config_get(struct pinctrl_dev *pctldev,
 			return -EINVAL;
 
 		break;
-	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN:
 	case MAX9296A_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX9296A_PINCTRL_TX_EN:
-	case MAX9296A_PINCTRL_RX_EN:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_A:
+	case MAX9296A_PINCTRL_TX_EN_A:
+	case MAX9296A_PINCTRL_RX_EN_A:
 	case MAX9296A_PINCTRL_INPUT_VALUE:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_B:
+	case MAX9296A_PINCTRL_TX_EN_B:
+	case MAX9296A_PINCTRL_RX_EN_B:
 	case PIN_CONFIG_OUTPUT_ENABLE:
 	case PIN_CONFIG_INPUT_ENABLE:
 	case PIN_CONFIG_OUTPUT:
@@ -512,8 +530,10 @@ static int max9296a_conf_pin_config_get(struct pinctrl_dev *pctldev,
 
 		val = field_get(mask, val) == en_val;
 		break;
-	case MAX9296A_PINCTRL_TX_ID:
-	case MAX9296A_PINCTRL_RX_ID:
+	case MAX9296A_PINCTRL_TX_ID_A:
+	case MAX9296A_PINCTRL_RX_ID_A:
+	case MAX9296A_PINCTRL_TX_ID_B:
+	case MAX9296A_PINCTRL_RX_ID_B:
 	case PIN_CONFIG_SLEW_RATE:
 		ret = regmap_read(priv->regmap, reg, &val);
 		if (ret < 0)
@@ -553,10 +573,13 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 
 		ret = regmap_update_bits(priv->regmap, reg, mask, val);
 		break;
-	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN:
 	case MAX9296A_PINCTRL_PULL_STRENGTH_WEAK:
-	case MAX9296A_PINCTRL_TX_EN:
-	case MAX9296A_PINCTRL_RX_EN:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_A:
+	case MAX9296A_PINCTRL_TX_EN_A:
+	case MAX9296A_PINCTRL_RX_EN_A:
+	case MAX9296A_PINCTRL_JITTER_COMPENSATION_EN_B:
+	case MAX9296A_PINCTRL_TX_EN_B:
+	case MAX9296A_PINCTRL_RX_EN_B:
 	case PIN_CONFIG_OUTPUT_ENABLE:
 	case PIN_CONFIG_INPUT_ENABLE:
 	case PIN_CONFIG_OUTPUT:
@@ -564,8 +587,10 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 
 		ret = regmap_update_bits(priv->regmap, reg, mask, val);
 		break;
-	case MAX9296A_PINCTRL_TX_ID:
-	case MAX9296A_PINCTRL_RX_ID:
+	case MAX9296A_PINCTRL_TX_ID_A:
+	case MAX9296A_PINCTRL_RX_ID_A:
+	case MAX9296A_PINCTRL_TX_ID_B:
+	case MAX9296A_PINCTRL_RX_ID_B:
 	case PIN_CONFIG_SLEW_RATE:
 		val = field_prep(mask, arg);
 
@@ -583,13 +608,23 @@ static int max9296a_conf_pin_config_set_one(struct max9296a_priv *priv,
 		config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT_ENABLE, 1);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
 	case PIN_CONFIG_OUTPUT_ENABLE:
-		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN, 0);
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN_A, 0);
+		ret = max9296a_conf_pin_config_set_one(priv, offset, config);
+		if (ret)
+			return ret;
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN_B, 0);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
-	case MAX9296A_PINCTRL_TX_ID:
-		config = pinconf_to_config_packed(MAX9296A_PINCTRL_TX_EN, 1);
+	case MAX9296A_PINCTRL_TX_ID_A:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_TX_EN_A, 1);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
-	case MAX9296A_PINCTRL_RX_ID:
-		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN, 1);
+	case MAX9296A_PINCTRL_RX_ID_A:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN_A, 1);
+		return max9296a_conf_pin_config_set_one(priv, offset, config);
+	case MAX9296A_PINCTRL_TX_ID_B:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_TX_EN_B, 1);
+		return max9296a_conf_pin_config_set_one(priv, offset, config);
+	case MAX9296A_PINCTRL_RX_ID_B:
+		config = pinconf_to_config_packed(MAX9296A_PINCTRL_RX_EN_B, 1);
 		return max9296a_conf_pin_config_set_one(priv, offset, config);
 	default:
 		break;
