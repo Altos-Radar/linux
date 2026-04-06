@@ -264,13 +264,13 @@ int max_serdes_get_streams_masks(struct device *dev,
 		u64 matched_streams_mask = updated_streams_mask;
 		u64 updated_sink_streams_mask;
 
+		streams_masks[i] = old_streams_masks[i];
 		updated_sink_streams_mask =
 			v4l2_subdev_state_xlate_streams(state, pad, i,
 							&matched_streams_mask);
 		if (!updated_sink_streams_mask)
 			continue;
 
-		streams_masks[i] = old_streams_masks[i];
 		if (enable)
 			streams_masks[i] |= updated_sink_streams_mask;
 		else
