@@ -65,7 +65,7 @@
 #define MAX9296A_VIDEO_PIPE_SEL_STREAM(p)	(GENMASK(1, 0) << ((p) * 3))
 #define MAX9296A_VIDEO_PIPE_SEL_LINK(p)		BIT(2 + (p) * 3)
 
-#define MAX9296A_VPRBS(p)			(0x1fc + (p) * 0x20)
+#define MAX9296A_VPRBS(p)			(0x1dc + (p) * 0x20)
 #define MAX9296A_VPRBS_VIDEO_LOCK		BIT(0)
 #define MAX9296A_VPRBS_PATGEN_CLK_SRC		BIT(7)
 #define MAX9296A_VPRBS_PATGEN_CLK_SRC_150MHZ	0b0
@@ -1433,7 +1433,7 @@ static int max9296a_set_tpg_clk(struct max9296a_priv *priv, u32 clock)
 	 * TPG data is always injected on link 0, which is always routed to
 	 * pipe 0.
 	 */
-	ret = regmap_update_bits(priv->regmap, MAX9296A_VPRBS(0),
+	ret = regmap_update_bits(priv->regmap, MAX9296A_VPRBS(1),
 				 MAX9296A_VPRBS_PATGEN_CLK_SRC,
 				 FIELD_PREP(MAX9296A_VPRBS_PATGEN_CLK_SRC,
 					    patgen_clk_src));
