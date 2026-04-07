@@ -1336,6 +1336,12 @@ static int max_des_update_pipe_enable(struct max_des_priv *priv,
 
 	pipe->enabled = enable;
 
+	if (enable) {
+		ret = des->ops->reset_link(des, pipe->link_id);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 

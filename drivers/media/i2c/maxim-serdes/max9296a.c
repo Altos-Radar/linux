@@ -1266,9 +1266,11 @@ static int max9296a_set_pipe_mode(struct max_des *des,
 				  MAX9296A_BACKTOP32_BPP12DBL(index), mode->dbl12);
 }
 
-static int max9296a_reset_link(struct max9296a_priv *priv, unsigned int index)
+static int max9296a_reset_link(struct max_des *des, unsigned int index)
 {
+	struct max9296a_priv *priv = des_to_priv(des);
 	unsigned int reg, mask;
+	int ret;
 
 	if (index == 0) {
 		reg = MAX9296A_CTRL0;
@@ -1278,7 +1280,9 @@ static int max9296a_reset_link(struct max9296a_priv *priv, unsigned int index)
 		mask = MAX9296A_CTRL2_RESET_ONESHOT_B;
 	}
 
-	return regmap_set_bits(priv->regmap, reg, mask);
+	ret = regmap_set_bits(priv->regmap, reg, mask);
+	msleep(200);
+	return ret;
 }
 
 static int max9296a_select_links(struct max_des *des, unsigned int mask)
@@ -1310,12 +1314,12 @@ static int max9296a_select_links(struct max_des *des, unsigned int mask)
 		return ret;
 
 	if (priv->info->has_per_link_reset) {
-		ret = max9296a_reset_link(priv, 1);
+		ret = max9296a_reset_link(des, 1);
 		if (ret)
 			return ret;
+	} else {
+		msleep(200);
 	}
-
-	msleep(200);
 
 	return 0;
 }
@@ -1525,6 +1529,7 @@ static const struct max_des_ops max9296a_common_ops = {
 	.set_pipe_mode = max9296a_set_pipe_mode,
 	.set_tpg = max9296a_set_tpg,
 	.select_links = max9296a_select_links,
+	.reset_link = max9296a_reset_link,
 	.set_link_version = max9296a_set_link_version,
 };
 

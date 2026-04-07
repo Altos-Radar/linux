@@ -122,6 +122,7 @@ struct max_des_ops {
 				      bool enable);
 	int (*init_link)(struct max_des *des, struct max_des_link *link);
 	int (*select_links)(struct max_des *des, unsigned int mask);
+	int (*reset_link)(struct max_des *des, unsigned int mask);
 	int (*set_link_version)(struct max_des *des, struct max_des_link *link,
 				enum max_serdes_gmsl_version version);
 };
