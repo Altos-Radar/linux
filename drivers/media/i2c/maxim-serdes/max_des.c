@@ -2461,42 +2461,42 @@ static int max_des_init_state(struct v4l2_subdev *sd,
 	};
 	struct max_des_priv *priv = v4l2_get_subdevdata(sd);
 	struct max_des *des = priv->des;
-	struct max_des_phy *phy = NULL;
+	struct max_des_phy *backup_phy = NULL;
 	unsigned int stream = 0;
 	unsigned int i;
 
 	for (i = 0; i < des->ops->num_phys; i++) {
 		if (des->phys[i].enabled) {
-			phy = &des->phys[i];
+			backup_phy = &des->phys[i];
 			break;
 		}
 	}
 
-	if (!phy)
+	if (!backup_phy)
 		return 0;
 
 	for (i = 0; i < des->ops->num_links; i++) {
 		struct max_des_link *link = &des->links[i];
+		struct max_des_phy* phy = backup_phy;
+		unsigned int source_stream;
 
 		if (!link->enabled)
 			continue;
+
+		if (i < des->ops->num_phys && des->phys[i].enabled) {
+			phy = &des->phys[i];
+			source_stream = 0;
+		} else {
+			source_stream = stream++;
+		}
 
 		routing.routes[routing.num_routes++] = (struct v4l2_subdev_route) {
 			.sink_pad = max_des_link_to_pad(des, link),
 			.sink_stream = 0,
 			.source_pad = max_des_phy_to_pad(des, phy),
-			.source_stream = stream,
+			.source_stream = source_stream,
 			.flags = V4L2_SUBDEV_ROUTE_FL_ACTIVE,
 		};
-		stream++;
-
-		/*
-		 * The Streams API is an experimental feature.
-		 * If multiple routes are provided here, userspace will not be
-		 * able to configure them unless the Streams API is enabled.
-		 * Provide a single route until it is enabled.
-		 */
-		break;
 	}
 
 	return __max_des_set_routing(sd, state, &routing);
