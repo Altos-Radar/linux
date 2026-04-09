@@ -183,13 +183,25 @@
 #define MAX9296A_GMSL1_EN			0xf00
 #define MAX9296A_GMSL1_EN_LINK_EN		GENMASK(1, 0)
 
+#define MAX9296A_RLMS0A(x)			(0x140a + (x) * 0x100)
+#define MAX9296A_RLMS0B(x)			(0x140b + (x) * 0x100)
+#define MAX9296A_RLMS18(x)			(0x1418 + (x) * 0x100)
+#define MAX9296A_RLMS1F(x)			(0x141f + (x) * 0x100)
+#define MAX9296A_RLMS21(x)			(0x1421 + (x) * 0x100)
+#define MAX9296A_RLMS31(x)			(0x1431 + (x) * 0x100)
 #define MAX9296A_RLMS3E(x)			(0x143e + (x) * 0x100)
 #define MAX9296A_RLMS3F(x)			(0x143f + (x) * 0x100)
+#define MAX9296A_RLMS45(x)			(0x1445 + (x) * 0x100)
+#define MAX9296A_RLMS46(x)			(0x1446 + (x) * 0x100)
 #define MAX9296A_RLMS49(x)			(0x1449 + (x) * 0x100)
 #define MAX9296A_RLMS7E(x)			(0x147e + (x) * 0x100)
 #define MAX9296A_RLMS7F(x)			(0x147f + (x) * 0x100)
+#define MAX9296A_RLMS8C(x)			(0x148c + (x) * 0x100)
+#define MAX9296A_RLMS98(x)			(0x1498 + (x) * 0x100)
 #define MAX9296A_RLMSA3(x)			(0x14a3 + (x) * 0x100)
 #define MAX9296A_RLMSA5(x)			(0x14a5 + (x) * 0x100)
+#define MAX9296A_RLMSAC(x)			(0x14ac + (x) * 0x100)
+#define MAX9296A_RLMSAD(x)			(0x14ad + (x) * 0x100)
 #define MAX9296A_RLMSD8(x)			(0x14d8 + (x) * 0x100)
 
 #define MAX9296A_DPLL_0(x)			(0x1c00 + (x) * 0x100)
@@ -1783,6 +1795,46 @@ static const struct max_des_ops max96716a_ops = {
 	.num_links = 2,
 };
 
+/*
+ * These register writes are described as required in MAX96716A/MAX96716F errata
+ * errata rev 10, points 5 and 10, for robust operation.
+ */
+
+static const struct reg_sequence max96716a_rlms_reg_sequence[] = {
+	{ MAX9296A_RLMS49(0), 0xF5 },
+	{ MAX9296A_RLMS49(1), 0xF5 },
+	{ MAX9296A_RLMS3F(0), 0x3D },
+	{ MAX9296A_RLMS3F(1), 0x3D },
+	{ MAX9296A_RLMS3E(0), 0xFD },
+	{ MAX9296A_RLMS3E(1), 0xFD },
+	{ MAX9296A_RLMSAD(0), 0x68 },
+	{ MAX9296A_RLMSAD(1), 0x68 },
+	{ MAX9296A_RLMSAC(0), 0xA8 },
+	{ MAX9296A_RLMSAC(1), 0xA8 },
+	{ MAX9296A_RLMS18(0), 0x07 },  // Not for 3Gbps operation
+	{ MAX9296A_RLMS18(1), 0x07 },  // Not for 3Gbps operation
+	{ MAX9296A_RLMS1F(0), 0xC2 },  // Not for 3Gbps operation
+	{ MAX9296A_RLMS1F(1), 0xC2 },  // Not for 3Gbps operation
+	{ MAX9296A_RLMS8C(0), 0x20 },
+	{ MAX9296A_RLMS8C(1), 0x20 },
+	{ MAX9296A_RLMS98(0), 0xC0 },
+	{ MAX9296A_RLMS98(1), 0xC0 },
+	{ MAX9296A_RLMS46(0), 0x01 },
+	{ MAX9296A_RLMS46(1), 0x01 },
+	{ MAX9296A_RLMS45(0), 0x81 },
+	{ MAX9296A_RLMS45(1), 0x81 },
+	{ MAX9296A_RLMS0B(0), 0x44 },
+	{ MAX9296A_RLMS0B(1), 0x44 },
+	{ MAX9296A_RLMS0A(0), 0x08 },
+	{ MAX9296A_RLMS0A(1), 0x08 },
+	{ MAX9296A_RLMS31(0), 0x18 },
+	{ MAX9296A_RLMS31(1), 0x18 },
+	{ MAX9296A_RLMS21(0), 0x08 },
+	{ MAX9296A_RLMS21(1), 0x08 },
+	{ MAX9296A_RLMSA5(0), 0x70 },
+	{ MAX9296A_RLMSA5(1), 0x70 },
+};
+
 static const struct max9296a_chip_info max96716a_info = {
 	.ops = &max96716a_ops,
 	.max_register = 0x52d6,
@@ -1790,6 +1842,8 @@ static const struct max9296a_chip_info max96716a_info = {
 	.phy0_lanes_0_1_on_second_phy = true,
 	.supports_cphy = true,
 	.supports_phy_log = true,
+	.rlms_adjust_sequence = max96716a_rlms_reg_sequence,
+	.rlms_adjust_sequence_len = ARRAY_SIZE(max96716a_rlms_reg_sequence),
 	.pipe_hw_ids = { 1, 2 },
 	.phy_hw_ids = { 1, 2 },
 };
