@@ -39,11 +39,13 @@
 
 #define MAX9296A_CTRL0				0x10
 #define MAX9296A_CTRL0_LINK_CFG			GENMASK(1, 0)
+#define MAX9296A_CTRL0_REG_ENABLE		BIT(2)
 #define MAX9296A_CTRL0_AUTO_LINK		BIT(4)
 #define MAX9296A_CTRL0_RESET_ONESHOT		BIT(5)
 #define MAX9296A_CTRL0_RESET_ALL		BIT(7)
 
 #define MAX9296A_CTRL2				0x12
+#define MAX9296A_CTRL2_REG_MNL			BIT(4)
 #define MAX9296A_CTRL2_RESET_ONESHOT_B		BIT(5)
 
 #define MAX9296A_MIPI_TX0(x)			(0x28 + (x) * 0x5000)
@@ -233,6 +235,7 @@ struct max9296a_priv {
 	struct pinctrl_dev *pctldev;
 
 	struct gpio_desc *gpiod_pwdn;
+	struct regulator *vdd;
 };
 
 struct max9296a_chip_info {
@@ -859,6 +862,25 @@ static int max9296a_init(struct max_des *des)
 	if (ret)
 		return ret;
 
+	priv->vdd = devm_regulator_get_optional(priv->dev, "vdd");
+	if (priv->vdd) {
+		int voltage = regulator_get_voltage(priv->vdd);
+		if (voltage >= 1140000) {
+			/*
+			 * The internal voltage regulator may inadvertantly switch to bypass mode.
+			 * This forces the regulator to stay on. See datasheet/errata.
+			 */
+			ret = regmap_update_bits(priv->regmap, MAX9296A_CTRL0,
+						 MAX9296A_CTRL0_REG_ENABLE, MAX9296A_CTRL0_REG_ENABLE);
+			if (ret)
+				return ret;
+
+			ret = regmap_update_bits(priv->regmap, MAX9296A_CTRL2,
+						 MAX9296A_CTRL2_REG_MNL, MAX9296A_CTRL2_REG_MNL);
+			if (ret)
+				return ret;
+		}
+	}
 
 	if (priv->info->rlms_adjust_sequence) {
 		ret = regmap_multi_reg_write(priv->regmap,
