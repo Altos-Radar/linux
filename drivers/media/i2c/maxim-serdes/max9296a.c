@@ -105,6 +105,10 @@
 #define MAX9296A_CHKR_RPT_B			0x265
 #define MAX9296A_CHKR_ALT			0x266
 
+#define MAX9296A_CMU2				0x302
+#define MAX9296A_CMU2_PFDDIV_RSHORT		GENMASK(6, 4)
+#define MAX9296A_CMU2_PFDDIV_RSHORT_1_1V	0b001
+
 #define MAX9296A_BACKTOP12			0x313
 #define MAX9296A_BACKTOP12_CSI_OUT_EN		BIT(1)
 
@@ -843,6 +847,18 @@ static int max9296a_init(struct max_des *des)
 {
 	struct max9296a_priv *priv = des_to_priv(des);
 	int ret;
+
+	/*
+	 * Set CMU2 PFDDIV to 1.1V for correct functionality of the device,
+	 * as mentioned in the datasheet, under section MANDATORY REGISTER PROGRAMMING.
+	 */
+	ret = regmap_update_bits(priv->regmap, MAX9296A_CMU2,
+				 MAX9296A_CMU2_PFDDIV_RSHORT,
+				 FIELD_PREP(MAX9296A_CMU2_PFDDIV_RSHORT,
+					    MAX9296A_CMU2_PFDDIV_RSHORT_1_1V));
+	if (ret)
+		return ret;
+
 
 	if (priv->info->rlms_adjust_sequence) {
 		ret = regmap_multi_reg_write(priv->regmap,
