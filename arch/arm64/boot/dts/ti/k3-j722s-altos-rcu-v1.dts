@@ -53,6 +53,18 @@
 			};
 		};
 	};
+
+	main_pwm2: dmtimer-main-pwm-2 {
+		compatible = "ti,omap-dmtimer-pwm";
+		#pwm-cells = <3>;
+		ti,timers = <&main_timer2>;
+	};
+
+	main_pwm3: dmtimer-main-pwm-3 {
+		compatible = "ti,omap-dmtimer-pwm";
+		#pwm-cells = <3>;
+		ti,timers = <&main_timer3>;
+	};
 };
 
 &main_pmx0 {
@@ -73,7 +85,7 @@
 	serdes1_pins_default: serdes1-default-pins {
 		pinctrl-single,pins = <
 			J722S_IOPAD(0x0198, PIN_INPUT, 7)  /* (A26) MCASP0_AXR2.GPIO1_8 */
-			J722S_IOPAD(0x0230, PIN_OUTPUT, 7) /* (H23) MMC1_DAT0.GPIO1_45 */
+			J722S_IOPAD(0x0230, PIN_OUTPUT, 2) /* (H23) MMC1_DAT0.TIMER_IO3 */
 			J722S_IOPAD(0x01c0, PIN_OUTPUT, 7) /* (E19) SPI0_D0.GPIO1_18 */
 		>;
 	};
@@ -81,7 +93,7 @@
 	serdes2_pins_default: serdes2-default-pins {
 		pinctrl-single,pins = <
 			J722S_IOPAD(0x0194, PIN_INPUT, 7)  /* (A25) MCASP0_AXR3.GPIO1_7 */
-			J722S_IOPAD(0x022c, PIN_OUTPUT, 7) /* (H20) MMC1_DAT1.GPIO1_44 */
+			J722S_IOPAD(0x022c, PIN_OUTPUT, 2) /* (H20) MMC1_DAT1.TIMER_IO2 */
 			J722S_IOPAD(0x01c4, PIN_OUTPUT, 7) /* (E20) SPI0_D1.GPIO1_19 */
 		>;
 	};

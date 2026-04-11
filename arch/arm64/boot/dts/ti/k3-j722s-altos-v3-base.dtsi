@@ -593,7 +593,7 @@
 	status = "reserved";
 };
 
-&main_timer2 {
+&main_timer4 {
 	status = "reserved";
 };
 
