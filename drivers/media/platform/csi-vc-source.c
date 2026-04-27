@@ -11,6 +11,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-mc.h>
 #include <media/v4l2-subdev.h>
+#include <media/v4l2-fwnode.h>
 
 struct csi_vc {
 	struct v4l2_subdev subdev;
@@ -144,11 +145,21 @@ static int csi_vc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct csi_vc *priv;
+	struct fwnode_handle *ep;
+	struct v4l2_fwnode_endpoint bus_cfg = {
+		.bus_type = V4L2_MBUS_CSI2_DPHY,
+	};
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	ep = fwnode_graph_get_next_endpoint(dev_fwnode(dev), NULL);
+	if (!ep) {
+		dev_err(dev, "Failed to find endpoint node\n");
+		return -EINVAL;
+	}
 
 	platform_set_drvdata(pdev, priv);
 
@@ -159,7 +170,18 @@ static int csi_vc_probe(struct platform_device *pdev)
 	snprintf(priv->subdev.name, sizeof(priv->subdev.name), "%s.%s",
 		 KBUILD_MODNAME, dev_name(&pdev->dev));
 
-	priv->tx_link_freq = 300000000;
+	ret = v4l2_fwnode_endpoint_alloc_parse(ep, &bus_cfg);
+	if (ret) {
+		dev_err(dev, "Failed to parse endpoint node\n");
+		goto err_free;
+	}
+
+	if (!bus_cfg.nr_of_link_frequencies) {
+		dev_err(dev, "Link frequencies not specified\n");
+		goto err_free;
+	}
+
+	priv->tx_link_freq = bus_cfg.link_frequencies[0];
 	v4l2_ctrl_handler_init(&priv->ctrl_handler, 1);
 	priv->link_freq = v4l2_ctrl_new_int_menu(&priv->ctrl_handler, NULL, V4L2_CID_LINK_FREQ,
 						 0, 0, &priv->tx_link_freq);

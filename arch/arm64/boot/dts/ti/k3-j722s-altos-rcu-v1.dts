@@ -17,6 +17,7 @@
 				remote-endpoint = <&rf_ser1_b_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <600000000>;
 			};
 		};
 	};
@@ -28,6 +29,7 @@
 				remote-endpoint = <&rf_ser1_d_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <600000000>;
 			};
 		};
 	};
@@ -39,6 +41,7 @@
 				remote-endpoint = <&rf_ser2_b_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <600000000>;
 			};
 		};
 	};
@@ -50,6 +53,7 @@
 				remote-endpoint = <&rf_ser2_d_ep>;
 				clock-lanes = <0>;
 				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <600000000>;
 			};
 		};
 	};
