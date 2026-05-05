@@ -91,6 +91,8 @@
 			J722S_IOPAD(0x0198, PIN_INPUT, 7)  /* (A26) MCASP0_AXR2.GPIO1_8 */
 			J722S_IOPAD(0x0230, PIN_OUTPUT, 2) /* (H23) MMC1_DAT0.TIMER_IO3 */
 			J722S_IOPAD(0x01c0, PIN_OUTPUT, 7) /* (E19) SPI0_D0.GPIO1_18 */
+			J722S_IOPAD(0x01ac, PIN_OUTPUT, 7) /* (C27) MCASP0_AFSR.GPIO1_13 */
+			J722S_IOPAD(0x01a0, PIN_OUTPUT, 7) /* (F23) MCASP0_AXR0.GPIO1_10 */
 		>;
 	};
 
@@ -99,6 +101,8 @@
 			J722S_IOPAD(0x0194, PIN_INPUT, 7)  /* (A25) MCASP0_AXR3.GPIO1_7 */
 			J722S_IOPAD(0x022c, PIN_OUTPUT, 2) /* (H20) MMC1_DAT1.TIMER_IO2 */
 			J722S_IOPAD(0x01c4, PIN_OUTPUT, 7) /* (E20) SPI0_D1.GPIO1_19 */
+			J722S_IOPAD(0x01a4, PIN_OUTPUT, 7) /* (D25) MCASP0_ACLKX.GPIO1_11 */
+			J722S_IOPAD(0x01a8, PIN_OUTPUT, 7) /* (C26) MCASP0_AFSX.GPIO1_12 */
 		>;
 	};
 };
@@ -164,7 +168,9 @@
 			<&des1_mfp2>,
 			<&des1_mfp3>,
 			<&des1_mfp4>,
-			<&des1_mfp8>;
+			<&des1_mfp8>,
+			<&des1_mfp9>,
+			<&des1_mfp10>;
 
 		des1_mfp1: des1-mfp1 {
 			pins = "mfp1";
@@ -206,6 +212,28 @@
 			input-enable;
 			maxim,tx-id-a = <16>;
 			maxim,tx-id-b = <16>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
+		};
+		des1_mfp9: des1-mfp9 {
+			pins = "mfp9";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <14>;
+			maxim,tx-id-b = <14>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
+		};
+		des1_mfp10: des1-mfp10 {
+			pins = "mfp10";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <15>;
+			maxim,tx-id-b = <15>;
 			maxim,jitter-compensation-a;
 			maxim,jitter-compensation-b;
 		};
@@ -276,7 +304,7 @@
 						drive-push-pull;
 						output-enable;
 						bias-disable;
-						maxim,rx-id = <16>;
+						maxim,rx-id = <14>;
 					};
 					ser1_a_mfp5: ser1-mfp5 {
 						pins = "mfp5";
@@ -361,7 +389,7 @@
 						drive-push-pull;
 						output-enable;
 						bias-disable;
-						maxim,rx-id = <16>;
+						maxim,rx-id = <15>;
 					};
 					ser1_b_mfp5: ser1-mfp5 {
 						pins = "mfp5";
@@ -443,7 +471,9 @@
 			<&des2_mfp2>,
 			<&des2_mfp3>,
 			<&des2_mfp4>,
-			<&des2_mfp8>;
+			<&des2_mfp8>,
+			<&des2_mfp9>,
+			<&des2_mfp10>;
 
 		des2_mfp1: des2-mfp1 {
 			pins = "mfp1";
@@ -485,6 +515,28 @@
 			input-enable;
 			maxim,tx-id-a = <16>;
 			maxim,tx-id-b = <16>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
+		};
+		des2_mfp9: des2-mfp9 {
+			pins = "mfp9";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <14>;
+			maxim,tx-id-b = <14>;
+			maxim,jitter-compensation-a;
+			maxim,jitter-compensation-b;
+		};
+		des2_mfp10: des2-mfp10 {
+			pins = "mfp10";
+			function = "gpio";
+			bias-disable;
+			output-disable;
+			input-enable;
+			maxim,tx-id-a = <15>;
+			maxim,tx-id-b = <15>;
 			maxim,jitter-compensation-a;
 			maxim,jitter-compensation-b;
 		};
@@ -552,7 +604,7 @@
 						drive-push-pull;
 						output-enable;
 						bias-disable;
-						maxim,rx-id = <16>;
+						maxim,rx-id = <14>;
 					};
 					ser2_a_mfp5: ser2-mfp5 {
 						pins = "mfp5";
@@ -634,7 +686,7 @@
 						drive-push-pull;
 						output-enable;
 						bias-disable;
-						maxim,rx-id = <16>;
+						maxim,rx-id = <15>;
 					};
 					ser2_b_mfp5: ser2-mfp5 {
 						pins = "mfp5";
