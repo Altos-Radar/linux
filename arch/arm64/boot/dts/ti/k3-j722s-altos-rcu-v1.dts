@@ -10,6 +10,7 @@
 
 / {
 	model = "Altos RCU V1";
+	compatible = "ti,j722s", "altos,awr-p0", "altos,awr-p1", "altos,awr-p2", "altos,awr-p3";
 	csi_vc0: csi-vc0 {
 		compatible = "csi-vc";
 		port {

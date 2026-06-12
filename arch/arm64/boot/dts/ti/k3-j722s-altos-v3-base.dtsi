@@ -14,7 +14,7 @@
 #include "k3-serdes.h"
 
 / {
-	compatible = "ti,j722s-evm", "ti,j722s";
+	compatible = "ti,j722s", "altos,awr-p0";
 
 	aliases {
 		serial0 = &wkup_uart0;
