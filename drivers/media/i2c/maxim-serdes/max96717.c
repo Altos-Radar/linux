@@ -19,6 +19,10 @@
 
 #define MAX96717_REG0				0x0
 
+#define MAX96717_REG1				0x1
+#define MAX96717_REG1_TX_RATE			GENMASK(3, 2)
+#define MAX96717_REG1_TX_RATE_6GBPS		0b10
+
 #define MAX96717_REG2				0x2
 #define MAX96717_REG2_VID_TX_EN_P(p)		BIT(4 + (p))
 
@@ -28,6 +32,9 @@
 
 #define MAX96717_REG6				0x6
 #define MAX96717_REG6_RCLKEN			BIT(5)
+
+#define MAX96717_CTRL1				0x11
+#define MAX96717_CTRL1_CXTP_A			BIT(0)
 
 #define MAX96717_I2C_2(x)			(0x42 + (x) * 0x2)
 #define MAX96717_I2C_2_SRC			GENMASK(7, 1)
@@ -192,6 +199,10 @@
 #define MAX96717_PIO_SLEW_2_PIO011_SLEW		GENMASK(7, 6)
 
 #define MAX96717_PIO_SLEW_FASTEST		0b00
+
+#define MAX96717_RLMSCE				0x14ce
+#define MAX96717_RLMSCE_ENMINUS_REG		BIT(4)
+#define MAX96717_RLMSCE_ENMINUS_MAN		BIT(3)
 
 #define MAX96717_BIAS_PULL_STRENGTH_1000000_OHM	1000000U
 #define MAX96717_BIAS_PULL_STRENGTH_40000_OHM	40000U
@@ -1352,6 +1363,7 @@ static int max96717_init(struct max_ser *ser)
 {
 	struct max96717_priv *priv = ser_to_priv(ser);
 	int ret;
+	unsigned int reg1, ctrl1;
 
 	/*
 	 * Set CMU2 PFDDIV to 1.1V for correct functionality of the device,
@@ -1363,6 +1375,24 @@ static int max96717_init(struct max_ser *ser)
 					    MAX96717_CMU2_PFDDIV_RSHORT_1_1V));
 	if (ret)
 		return ret;
+
+	ret = regmap_read(priv->regmap, MAX96717_REG1, &reg1);
+	if (ret)
+		return ret;
+
+	ret = regmap_read(priv->regmap, MAX96717_CTRL1, &ctrl1);
+	if (ret)
+		return ret;
+
+	if (ctrl1 & MAX96717_CTRL1_CXTP_A &&
+	    (reg1 & MAX96717_REG1_TX_RATE) ==
+	    FIELD_PREP(MAX96717_REG1_TX_RATE, MAX96717_REG1_TX_RATE_6GBPS)) {
+		ret = regmap_set_bits(priv->regmap, MAX96717_RLMSCE,
+				      MAX96717_RLMSCE_ENMINUS_REG |
+				      MAX96717_RLMSCE_ENMINUS_MAN);
+		if (ret)
+			return ret;
+	}
 
 	if (ser->ops->set_tunnel_enable) {
 		ret = ser->ops->set_tunnel_enable(ser, false);
