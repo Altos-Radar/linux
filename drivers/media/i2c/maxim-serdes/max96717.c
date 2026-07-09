@@ -36,6 +36,8 @@
 #define MAX96717_CTRL1				0x11
 #define MAX96717_CTRL1_CXTP_A			BIT(0)
 
+#define MAX96717_CNT0				0x22
+
 #define MAX96717_I2C_2(x)			(0x42 + (x) * 0x2)
 #define MAX96717_I2C_2_SRC			GENMASK(7, 1)
 
@@ -200,6 +202,15 @@
 
 #define MAX96717_PIO_SLEW_FASTEST		0b00
 
+#define MAX96717_RLMS03				0x1403
+#define MAX96717_RLMS04				0x1404
+#define MAX96717_RLMS84				0x1484
+#define MAX96717_RLMS85				0x1485
+#define MAX96717_RLMSA4				0x14a4
+#define MAX96717_RLMSBA				0x14ba
+#define MAX96717_RLMSC8				0x14c8
+#define MAX96717_RLMSC9				0x14c9
+#define MAX96717_RLMSCA				0x14ca
 #define MAX96717_RLMSCE				0x14ce
 #define MAX96717_RLMSCE_ENMINUS_REG		BIT(4)
 #define MAX96717_RLMSCE_ENMINUS_MAN		BIT(3)
@@ -1193,6 +1204,98 @@ static int max96717_set_pipe_mode(struct max_ser *ser,
 					     !!mode->soft_bpp));
 }
 
+static const struct reg_sequence max96717_start_forward_link_margin_test_reg_sequence[] = {
+	{ MAX96717_RLMSC9, 0x00 },
+	{ MAX96717_RLMSCA, 0x00 },
+	{ MAX96717_RLMSCE, 0x3E },
+	{ MAX96717_RLMSBA, 0x08 },
+};
+
+static const struct reg_sequence max96717_stop_forward_link_margin_test_reg_sequence[] = {
+	{ MAX96717_RLMSC9, 0x05 },
+	{ MAX96717_RLMSCA, 0x07 },
+	{ MAX96717_RLMSCE, 0x19 },
+	{ MAX96717_RLMSBA, 0x30 },
+};
+
+static int max96717_set_forward_link_margin_test(struct max_ser *ser, bool enable)
+{
+	struct max96717_priv *priv = ser_to_priv(ser);
+	int ret;
+
+	if (enable)
+		ret = regmap_multi_reg_write(priv->regmap,
+					     max96717_start_forward_link_margin_test_reg_sequence,
+					     ARRAY_SIZE(max96717_start_forward_link_margin_test_reg_sequence));
+	else
+		ret = regmap_multi_reg_write(priv->regmap,
+					     max96717_stop_forward_link_margin_test_reg_sequence,
+					     ARRAY_SIZE(max96717_stop_forward_link_margin_test_reg_sequence));
+
+	return ret;
+}
+
+static int max96717_set_tx_amplitude(struct max_ser *ser, unsigned int millivolts)
+{
+	struct max96717_priv *priv = ser_to_priv(ser);
+	int ret;
+	unsigned int ser_rep_ampl;
+	unsigned int tx_amplitude_code = (millivolts * 100 + 17450 + 268) / 535;
+	if (tx_amplitude_code < 64)
+		tx_amplitude_code -= 35;
+	ret = regmap_write(priv->regmap, MAX96717_RLMSC8, tx_amplitude_code & 0x7F);
+	if (ret)
+		return ret;
+
+	ser_rep_ampl = millivolts > 185 ? (568 * (millivolts * 1000 - 194600) + 14800) / 1000 : 6;
+	ser_rep_ampl &= 0xFF;
+	ret = regmap_write(priv->regmap, MAX96717_RLMS85, (ser_rep_ampl >> 1) | 0x80);
+	if (ret)
+		return ret;
+	return regmap_write(priv->regmap, MAX96717_RLMS84, (ser_rep_ampl & 0x01) << 7);
+}
+
+static const struct reg_sequence max96717_start_reverse_link_margin_test_reg_sequence[] = {
+	{ MAX96717_RLMSA4, 0xC0 },
+	{ MAX96717_RLMS04, 0x4A },
+	{ MAX96717_RLMS03, 0x0A },
+};
+
+static const struct reg_sequence max96717_stop_reverse_link_margin_test_reg_sequence[] = {
+	{ MAX96717_RLMSA4, 0xFF },
+	{ MAX96717_RLMS04, 0x4B },
+	{ MAX96717_RLMS03, 0x0A },
+};
+
+static int max96717_set_reverse_link_margin_test(struct max_ser *ser, bool enable)
+{
+	struct max96717_priv *priv = ser_to_priv(ser);
+	int ret;
+
+	if (enable)
+		ret = regmap_multi_reg_write(priv->regmap,
+					     max96717_start_reverse_link_margin_test_reg_sequence,
+					     ARRAY_SIZE(max96717_start_reverse_link_margin_test_reg_sequence));
+	else
+		ret = regmap_multi_reg_write(priv->regmap,
+					     max96717_stop_reverse_link_margin_test_reg_sequence,
+					     ARRAY_SIZE(max96717_stop_reverse_link_margin_test_reg_sequence));
+
+	return ret;
+}
+
+static int max96717_check_link(struct max_ser *ser)
+{
+	struct max96717_priv *priv = ser_to_priv(ser);
+	int ret;
+	unsigned int val;
+
+	ret = regmap_read(priv->regmap, MAX96717_CNT0, &val);
+	if (ret)
+		return ret;
+	return val;
+}
+
 static int max96717_set_i2c_xlate(struct max_ser *ser, unsigned int i,
 				  struct max_serdes_i2c_xlate *xlate)
 {
@@ -1462,6 +1565,10 @@ static const struct max_ser_ops max96717_ops = {
 	.set_pipe_mode = max96717_set_pipe_mode,
 	.set_pipe_stream_id = max96717_set_pipe_stream_id,
 	.set_pipe_phy = max96717_set_pipe_phy,
+	.set_forward_link_margin_test = max96717_set_forward_link_margin_test,
+	.set_tx_amplitude = max96717_set_tx_amplitude,
+	.set_reverse_link_margin_test = max96717_set_reverse_link_margin_test,
+	.check_link = max96717_check_link,
 };
 
 struct max96717_pll_predef_freq {

@@ -2005,6 +2005,50 @@ int max_ser_set_vc_remaps(struct v4l2_subdev *sd,
 	return 0;
 }
 
+int max_ser_set_forward_link_margin_test(struct v4l2_subdev *sd, bool enable)
+{
+	struct max_ser_priv *priv = sd_to_priv(sd);
+	struct max_ser *ser = priv->ser;
+
+	if (!ser->ops->set_forward_link_margin_test)
+		return -EOPNOTSUPP;
+
+	return ser->ops->set_forward_link_margin_test(ser, enable);
+}
+
+int max_ser_set_tx_amplitude(struct v4l2_subdev *sd, unsigned int millivolts)
+{
+	struct max_ser_priv *priv = sd_to_priv(sd);
+	struct max_ser *ser = priv->ser;
+
+	if (!ser->ops->set_tx_amplitude)
+		return -EOPNOTSUPP;
+
+	return ser->ops->set_tx_amplitude(ser, millivolts);
+}
+
+int max_ser_set_reverse_link_margin_test(struct v4l2_subdev *sd, bool enable)
+{
+	struct max_ser_priv *priv = sd_to_priv(sd);
+	struct max_ser *ser = priv->ser;
+
+	if (!ser->ops->set_reverse_link_margin_test)
+		return -EOPNOTSUPP;
+
+	return ser->ops->set_reverse_link_margin_test(ser, enable);
+}
+
+int max_ser_check_link(struct v4l2_subdev *sd)
+{
+	struct max_ser_priv *priv = sd_to_priv(sd);
+	struct max_ser *ser = priv->ser;
+
+	if (!ser->ops->check_link)
+		return -EOPNOTSUPP;
+
+	return ser->ops->check_link(ser);
+}
+
 static int max_ser_read_reg(struct i2c_adapter *adapter, u8 addr,
 			    u16 reg, u8 *val)
 {

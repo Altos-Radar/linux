@@ -125,6 +125,8 @@ struct max_des_ops {
 	int (*reset_link)(struct max_des *des, unsigned int mask);
 	int (*set_link_version)(struct max_des *des, struct max_des_link *link,
 				enum max_serdes_gmsl_version version);
+	int (*forward_link_margin_test)(struct max_des *des, enum max_serdes_gmsl_version, unsigned int idx, struct v4l2_subdev *ser_sd);
+	int (*reverse_link_margin_test)(struct max_des *des, enum max_serdes_gmsl_version, unsigned int idx, struct v4l2_subdev *ser_sd);
 };
 
 struct max_des_priv;
@@ -150,5 +152,8 @@ int max_des_probe(struct i2c_client *client, struct max_des *des);
 int max_des_remove(struct max_des *des);
 
 int max_des_phy_hw_data_lanes(struct max_des *des, struct max_des_phy *phy);
+
+#define MAX_DES_CMD_FORWARD_LINK_MARGIN_TEST _IOR('V', BASE_VIDIOC_PRIVATE + 0, unsigned int)
+#define MAX_DES_CMD_REVERSE_LINK_MARGIN_TEST _IOR('V', BASE_VIDIOC_PRIVATE + 1, unsigned int)
 
 #endif // MAX_DES_H

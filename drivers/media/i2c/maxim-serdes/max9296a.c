@@ -18,6 +18,7 @@
 #include <media/mipi-csi2.h>
 
 #include "max_des.h"
+#include "max_ser.h"
 
 #define MAX9296A_REG0				0x0
 
@@ -47,6 +48,14 @@
 #define MAX9296A_CTRL2				0x12
 #define MAX9296A_CTRL2_REG_MNL			BIT(4)
 #define MAX9296A_CTRL2_RESET_ONESHOT_B		BIT(5)
+
+#define MAX9296A_CTRL3				0x13
+#define MAX9296A_CTRL3_LOCKED			BIT(3)
+
+#define MAX9296A_CTRL9				0x5009
+
+#define MAX9296A_CNT0				0x22
+#define MAX9296A_CNT1				0x23
 
 #define MAX9296A_MIPI_TX0(x)			(0x28 + (x) * 0x5000)
 #define MAX9296A_MIPI_TX0_RX_FEC_EN		BIT(1)
@@ -189,6 +198,7 @@
 #define MAX9296A_GMSL1_EN			0xf00
 #define MAX9296A_GMSL1_EN_LINK_EN		GENMASK(1, 0)
 
+#define MAX9296A_RLMS03(x)			(0x1403 + (x) * 0x100)
 #define MAX9296A_RLMS0A(x)			(0x140a + (x) * 0x100)
 #define MAX9296A_RLMS0B(x)			(0x140b + (x) * 0x100)
 #define MAX9296A_RLMS18(x)			(0x1418 + (x) * 0x100)
@@ -203,6 +213,7 @@
 #define MAX9296A_RLMS7E(x)			(0x147e + (x) * 0x100)
 #define MAX9296A_RLMS7F(x)			(0x147f + (x) * 0x100)
 #define MAX9296A_RLMS8C(x)			(0x148c + (x) * 0x100)
+#define MAX9296A_RLMS95(x)			(0x1495 + (x) * 0x100)
 #define MAX9296A_RLMS98(x)			(0x1498 + (x) * 0x100)
 #define MAX9296A_RLMSA3(x)			(0x14a3 + (x) * 0x100)
 #define MAX9296A_RLMSA5(x)			(0x14a5 + (x) * 0x100)
@@ -1555,6 +1566,222 @@ static const struct max_serdes_tpg_entry max9296a_tpg_entries[] = {
 	MAX_TPG_ENTRY_1920X1080P60_RGB888,
 };
 
+static int max9296a_6g_forward_link_margin_test(struct max_des *des, unsigned int idx, struct v4l2_subdev *ser_sd)
+{
+	struct max9296a_priv *priv = des_to_priv(des);
+	int ret;
+	unsigned int val;
+	int start_mv = 410;
+	int current_mv = start_mv;
+	int working_mv = start_mv;
+	int end_mv = 50;
+	unsigned int lock_reg, cnt_reg;
+
+	if (idx == 0) {
+		lock_reg = MAX9296A_CTRL3;
+		cnt_reg = MAX9296A_CNT0;
+	} else {
+		lock_reg = MAX9296A_CTRL9;
+		cnt_reg = MAX9296A_CNT1;
+	}
+
+	ret = regmap_read(priv->regmap, lock_reg, &val);
+	if (ret) {
+		dev_err(priv->dev, "Failed to read lock register: %d\n", ret);
+		return ret;
+	}
+
+	if ((val & MAX9296A_CTRL3_LOCKED) == 0) {
+		dev_err(priv->dev, "Link not locked - aborting link margin test\n");
+		return 0;
+	}
+
+	ret = regmap_read(priv->regmap, cnt_reg, &val);
+	if (ret) {
+		dev_err(priv->dev, "Failed to read count register: %d\n", ret);
+		return ret;
+	}
+
+	if (val > 0) {
+		dev_err(priv->dev, "Link has errors - aborting link margin test\n");
+		return 0;
+	}
+
+	ret = max_ser_set_forward_link_margin_test(ser_sd, true);
+	if (ret) {
+		dev_err(priv->dev, "Failed to setup serializer for link margin test: %d\n", ret);
+		return ret;
+	}
+
+	while (current_mv >= end_mv) {
+		ret = max_ser_set_tx_amplitude(ser_sd, current_mv);
+		if (ret) {
+			dev_err(priv->dev, "Failed to set serializer tx amplitude: %d\n", ret);
+			break;
+		}
+
+		ret = regmap_write(priv->regmap, MAX9296A_RLMS03(idx), 0x8A);
+		if (ret) {
+			dev_err(priv->dev, "Failed to write RLMS03: %d\n", ret);
+			return ret;
+		}
+
+		msleep(100);
+
+		ret = regmap_write(priv->regmap, MAX9296A_RLMS03(idx), 0x0A);
+		if (ret) {
+			dev_err(priv->dev, "Failed to write RLMS03: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_read(priv->regmap, lock_reg, &val);
+		if (ret) {
+			dev_err(priv->dev, "Failed to read lock register: %d\n", ret);
+			return ret;
+		}
+
+		if ((val & MAX9296A_CTRL3_LOCKED) == 0)
+			break;
+
+		ret = regmap_read(priv->regmap, cnt_reg, &val);
+		if (ret) {
+			dev_err(priv->dev, "Failed to read count register: %d\n", ret);
+			return ret;
+		}
+
+		msleep(2000);
+
+		ret = regmap_read(priv->regmap, cnt_reg, &val);
+		if (ret) {
+			dev_err(priv->dev, "Failed to read count register: %d\n", ret);
+			return ret;
+		}
+
+		if (val > 0)
+			break;
+
+		working_mv = current_mv;
+		current_mv -= 10;
+	}
+
+	ret = max_ser_set_forward_link_margin_test(ser_sd, false);
+	if (ret)
+		dev_err(priv->dev, "Failed to setup serializer after link margin test: %d\n", ret);
+	return start_mv - working_mv;
+}
+
+static int max9296a_forward_link_margin_test(struct max_des *des,
+					     enum max_serdes_gmsl_version version,
+					     unsigned int idx,
+					     struct v4l2_subdev *ser_sd)
+{
+	switch (version) {
+	case MAX_SERDES_GMSL_2_6GBPS:
+		return max9296a_6g_forward_link_margin_test(des, idx, ser_sd);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int max9296a_reverse_link_margin_test(struct max_des *des,
+					     enum max_serdes_gmsl_version version,
+					     unsigned int idx,
+					     struct v4l2_subdev *ser_sd)
+{
+	struct max9296a_priv *priv = des_to_priv(des);
+	int ret;
+	unsigned int val;
+	int start_mv = 250;
+	int current_mv = start_mv;
+	int working_mv = start_mv;
+	int end_mv = 50;
+	unsigned int lock_reg;
+
+	if (idx == 0) {
+		lock_reg = MAX9296A_CTRL3;
+	} else {
+		lock_reg = MAX9296A_CTRL9;
+	}
+
+	ret = regmap_read(priv->regmap, lock_reg, &val);
+	if (ret) {
+		dev_err(priv->dev, "Failed to read lock register: %d\n", ret);
+		return ret;
+	}
+
+	if ((val & MAX9296A_CTRL3_LOCKED) == 0) {
+		dev_err(priv->dev, "Link not locked - aborting link margin test\n");
+		return 0;
+	}
+
+	ret = max_ser_check_link(ser_sd);
+	if (ret) {
+		dev_err(priv->dev, "Link has errors (%d) - aborting link margin test\n", ret);
+		return 0;
+	}
+
+	ret = max_ser_set_reverse_link_margin_test(ser_sd, true);
+	if (ret) {
+		dev_err(priv->dev, "Failed to setup serializer for link margin test: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_update_bits(priv->regmap, MAX9296A_RLMS95(idx), 0x80, 0x80);
+	if (ret) {
+		dev_err(priv->dev, "Failed to setup deserializer for link margin test: %d\n", ret);
+		return ret;
+	}
+
+	while (current_mv >= end_mv) {
+		unsigned int tx_amplitude_code = current_mv / 10;
+		ret = regmap_update_bits(priv->regmap, MAX9296A_RLMS95(idx), 0x3F, tx_amplitude_code);
+		if (ret) {
+			dev_err(priv->dev, "Failed to set deserializer tx amplitude: %d\n", ret);
+			return ret;
+		}
+		ret = regmap_update_bits(priv->regmap, MAX9296A_RLMS03(idx), 0x80, 0x80);
+		if (ret) {
+			dev_err(priv->dev, "Failed to write RLMS3: %d\n", ret);
+			return ret;
+		}
+		msleep(100);
+		ret = regmap_update_bits(priv->regmap, MAX9296A_RLMS03(idx), 0x80, 0x00);
+		if (ret) {
+			dev_err(priv->dev, "Failed to write RLMS3: %d\n", ret);
+			return ret;
+		}
+		ret = regmap_read(priv->regmap, lock_reg, &val);
+		if (ret) {
+			dev_err(priv->dev, "Failed to read lock register: %d\n", ret);
+			return ret;
+		}
+
+		if ((val & MAX9296A_CTRL3_LOCKED) == 0) {
+			break;
+		}
+
+		ret = max_ser_check_link(ser_sd);
+		if (ret < 0) {
+			break;
+		}
+
+		msleep(2000);
+
+		ret = max_ser_check_link(ser_sd);
+		if (ret) {
+			break;
+		}
+
+		working_mv = current_mv;
+		current_mv -= 10;
+	}
+
+	ret = max_ser_set_reverse_link_margin_test(ser_sd, false);
+	if (ret)
+		dev_err(priv->dev, "Failed to setup serializer after link margin test: %d\n", ret);
+	return start_mv - working_mv;
+}
+
 static const struct max_des_ops max9296a_common_ops = {
 	.num_remaps_per_pipe = 16,
 	.tpg_entries = {
@@ -1581,6 +1808,8 @@ static const struct max_des_ops max9296a_common_ops = {
 	.select_links = max9296a_select_links,
 	.reset_link = max9296a_reset_link,
 	.set_link_version = max9296a_set_link_version,
+	.forward_link_margin_test = max9296a_forward_link_margin_test,
+	.reverse_link_margin_test = max9296a_reverse_link_margin_test,
 };
 
 static struct pinctrl_ops max9296a_ctrl_ops = {

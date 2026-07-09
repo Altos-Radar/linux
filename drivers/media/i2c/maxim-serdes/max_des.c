@@ -2042,6 +2042,37 @@ static int max_des_log_status(struct v4l2_subdev *sd)
 	return 0;
 }
 
+static long max_des_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
+{
+	struct max_des_priv *priv = v4l2_get_subdevdata(sd);
+	struct max_des *des = priv->des;
+	struct max_des_link *link;
+	struct max_serdes_source *source;
+	unsigned int idx;
+
+	switch (cmd) {
+	case MAX_DES_CMD_FORWARD_LINK_MARGIN_TEST:
+		idx = *(unsigned int *)arg;
+		if (idx >= des->ops->num_links)
+			return -EINVAL;
+		link = &des->links[idx];
+		source = max_des_get_link_source(priv, link);
+		if (des->ops->forward_link_margin_test)
+			return des->ops->forward_link_margin_test(des, link->version, idx, source->sd);
+		break;
+	case MAX_DES_CMD_REVERSE_LINK_MARGIN_TEST:
+		idx = *(unsigned int *)arg;
+		if (idx >= des->ops->num_links)
+			return -EINVAL;
+		link = &des->links[idx];
+		source = max_des_get_link_source(priv, link);
+		if (des->ops->reverse_link_margin_test)
+			return des->ops->reverse_link_margin_test(des, link->version, idx, source->sd);
+		break;
+	}
+	return -ENOTTY;
+}
+
 static int max_des_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct max_des_priv *priv = ctrl_to_priv(ctrl->handler);
@@ -2533,6 +2564,7 @@ static int max_des_s_register(struct v4l2_subdev *sd,
 
 static const struct v4l2_subdev_core_ops max_des_core_ops = {
 	.log_status = max_des_log_status,
+	.ioctl = max_des_ioctl,
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	.g_register = max_des_g_register,
 	.s_register = max_des_s_register,

@@ -64,6 +64,7 @@ struct max_ser_ops {
 	struct max_serdes_phys_configs phys_configs;
 	struct max_serdes_tpg_entries tpg_entries;
 	enum max_serdes_gmsl_mode tpg_mode;
+	unsigned int gmsl2_forward_link_margin_algo;
 	unsigned int tpg_patterns;
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
@@ -99,6 +100,10 @@ struct max_ser_ops {
 	unsigned int (*get_pipe_stream_id)(struct max_ser *ser, struct max_ser_pipe *pipe);
 	int (*set_pipe_phy)(struct max_ser *ser, struct max_ser_pipe *pipe,
 			    struct max_ser_phy *phy);
+	int (*set_forward_link_margin_test)(struct max_ser *ser, bool enable);
+	int (*set_tx_amplitude)(struct max_ser *ser, unsigned int millivolts);
+	int (*set_reverse_link_margin_test)(struct max_ser *ser, bool enable);
+	int (*check_link)(struct max_ser *ser);
 };
 
 struct max_ser_priv;
@@ -135,6 +140,11 @@ int max_ser_set_stream_id(struct v4l2_subdev *sd, unsigned int stream_id);
 int max_ser_get_stream_id(struct v4l2_subdev *sd, unsigned int *stream_id);
 int max_ser_set_vc_remaps(struct v4l2_subdev *sd, struct max_serdes_vc_remap *vc_remaps,
 			  int num_vc_remaps);
+
+int max_ser_set_forward_link_margin_test(struct v4l2_subdev *sd, bool enable);
+int max_ser_set_tx_amplitude(struct v4l2_subdev *sd, unsigned int millivolts);
+int max_ser_set_reverse_link_margin_test(struct v4l2_subdev *sd, bool enable);
+int max_ser_check_link(struct v4l2_subdev *sd);
 
 int max_ser_reset(struct i2c_adapter *adapter, u8 addr);
 int max_ser_wait(struct i2c_adapter *adapter, u8 addr);
