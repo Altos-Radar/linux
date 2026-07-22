@@ -153,7 +153,7 @@ int max_des_remove(struct max_des *des);
 
 int max_des_phy_hw_data_lanes(struct max_des *des, struct max_des_phy *phy);
 
-#define MAX_DES_CMD_FORWARD_LINK_MARGIN_TEST _IOR('V', BASE_VIDIOC_PRIVATE + 0, unsigned int)
-#define MAX_DES_CMD_REVERSE_LINK_MARGIN_TEST _IOR('V', BASE_VIDIOC_PRIVATE + 1, unsigned int)
+#define MAX_DES_CMD_FORWARD_LINK_MARGIN_TEST _IOW('V', BASE_VIDIOC_PRIVATE + 0, unsigned int)
+#define MAX_DES_CMD_REVERSE_LINK_MARGIN_TEST _IOW('V', BASE_VIDIOC_PRIVATE + 1, unsigned int)
 
 #endif // MAX_DES_H
