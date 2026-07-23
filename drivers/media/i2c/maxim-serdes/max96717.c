@@ -1243,12 +1243,12 @@ static int max96717_set_tx_amplitude(struct max_ser *ser, unsigned int millivolt
 	unsigned int tx_amplitude_code = (millivolts * 100 + 17450 + 268) / 535;
 	if (tx_amplitude_code < 64)
 		tx_amplitude_code -= 35;
+	ser_rep_ampl = millivolts > 185 ? (568 * (millivolts * 10 - 1946) + 148000) / 10000 : 6;
+	ser_rep_ampl &= 0xFF;
 	ret = regmap_write(priv->regmap, MAX96717_RLMSC8, tx_amplitude_code & 0x7F);
 	if (ret)
 		return ret;
 
-	ser_rep_ampl = millivolts > 185 ? (568 * (millivolts * 1000 - 194600) + 14800) / 1000 : 6;
-	ser_rep_ampl &= 0xFF;
 	ret = regmap_write(priv->regmap, MAX96717_RLMS85, (ser_rep_ampl >> 1) | 0x80);
 	if (ret)
 		return ret;
