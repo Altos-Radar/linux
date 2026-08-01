@@ -109,6 +109,7 @@ struct ti_sci_info {
 	struct device *dev;
 	const struct ti_sci_desc *desc;
 	struct dentry *d;
+	struct dentry *soc_uid;
 	void __iomem *debug_region;
 	char *debug_buffer;
 	size_t debug_region_size;
@@ -128,6 +129,15 @@ struct ti_sci_info {
 #define handle_to_ti_sci_info(h) container_of(h, struct ti_sci_info, handle)
 
 #ifdef CONFIG_DEBUG_FS
+
+static struct ti_sci_xfer *ti_sci_get_one_xfer(struct ti_sci_info *info,
+					       u16 msg_type, u32 msg_flags,
+					       size_t tx_message_size,
+					       size_t rx_message_size);
+static void ti_sci_put_one_xfer(struct ti_sci_xfers_info *minfo,
+				struct ti_sci_xfer *xfer);
+static inline int ti_sci_do_xfer(struct ti_sci_info *info,
+				 struct ti_sci_xfer *xfer);
 
 /**
  * ti_sci_debug_show() - Helper to dump the debug log
@@ -154,6 +164,42 @@ static int ti_sci_debug_show(struct seq_file *s, void *unused)
 
 /* Provide the log file operations interface*/
 DEFINE_SHOW_ATTRIBUTE(ti_sci_debug);
+
+static int ti_sci_soc_uid_show(struct seq_file *s, void *unused)
+{
+	struct ti_sci_info *info = s->private;
+	struct ti_sci_msg_resp_get_soc_uid *soc_uid;
+	struct ti_sci_xfer *xfer;
+	struct device *dev = info->dev;
+	int ret, i;
+
+	xfer = ti_sci_get_one_xfer(info, TI_SCI_MSG_GET_SOC_UID,
+				   TI_SCI_FLAG_REQ_ACK_ON_PROCESSED,
+				   sizeof(struct ti_sci_msg_hdr),
+				   sizeof(*soc_uid));
+	if (IS_ERR(xfer)) {
+		ret = PTR_ERR(xfer);
+		dev_err(dev, "Message alloc failed(%d)\n", ret);
+		return ret;
+	}
+
+	soc_uid = (struct ti_sci_msg_resp_get_soc_uid *)xfer->xfer_buf;
+
+	ret = ti_sci_do_xfer(info, xfer);
+	if (ret) {
+		dev_err(dev, "Mbox send fail %d\n", ret);
+		goto fail;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(soc_uid->soc_uid); ++i) {
+		seq_put_hex_ll(s, NULL, be32_to_cpu(soc_uid->soc_uid[i]), 8);
+	}
+
+fail:
+	ti_sci_put_one_xfer(&info->minfo, xfer);
+	return ret;
+}
+DEFINE_SHOW_ATTRIBUTE(ti_sci_soc_uid);
 
 /**
  * ti_sci_debugfs_create() - Create log debug file
@@ -188,6 +234,13 @@ static int ti_sci_debugfs_create(struct platform_device *pdev,
 		 dev_name(dev));
 	info->d = debugfs_create_file(debug_name, 0444, NULL, info,
 				      &ti_sci_debug_fops);
+	if (IS_ERR(info->d))
+		return PTR_ERR(info->d);
+
+	snprintf(debug_name, sizeof(debug_name), "ti_sci_soc_uid@%s",
+		 dev_name(dev));
+	info->soc_uid = debugfs_create_file(debug_name, 0444, NULL, info,
+					    &ti_sci_soc_uid_fops);
 	if (IS_ERR(info->d))
 		return PTR_ERR(info->d);
 
@@ -4031,6 +4084,7 @@ out:
 	if (!IS_ERR(info->chan_rx))
 		mbox_free_channel(info->chan_rx);
 	debugfs_remove(info->d);
+	debugfs_remove(info->soc_uid);
 	return ret;
 }
 

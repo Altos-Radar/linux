@@ -78,6 +78,9 @@
 #define TISCI_MSG_RM_UDMAP_FLOW_GET_CFG		0x1232
 #define TISCI_MSG_RM_UDMAP_FLOW_SIZE_THRESH_GET_CFG	0x1233
 
+/* Runtime debug requests */
+#define TI_SCI_MSG_GET_SOC_UID		0x9021
+
 /* Processor Control requests */
 #define TI_SCI_MSG_PROC_REQUEST		0xc000
 #define TI_SCI_MSG_PROC_RELEASE		0xc001
@@ -1411,6 +1414,24 @@ struct ti_sci_msg_rm_udmap_flow_cfg_req {
 	u16 rx_fdq2_qnum;
 	u16 rx_fdq3_qnum;
 	u8 rx_ps_location;
+} __packed;
+
+/**
+ * struct ti_sci_msg_get_soc_uid_req - Request for TI_SCI_MSG_GET_SOC_UID
+ * @hdr:		Generic Header
+ */
+struct ti_sci_msg_req_get_soc_uid {
+	struct ti_sci_msg_hdr hdr;
+} __packed;
+
+/**
+ * struct ti_sci_msg_get_soc_uid_resp - Response for TI_SCI_MSG_GET_SOC_UID
+ * @hdr:		Generic Header
+ * @soc_uid:		SoC UID
+ */
+struct ti_sci_msg_resp_get_soc_uid {
+	struct ti_sci_msg_hdr hdr;
+	u32 soc_uid[8];
 } __packed;
 
 /**
