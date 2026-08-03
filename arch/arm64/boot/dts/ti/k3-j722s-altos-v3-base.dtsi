@@ -243,6 +243,8 @@
 	pmic_irq_pins_default: pmic-irq-default-pins {
 		pinctrl-single,pins = <
 			J722S_IOPAD(0x030, PIN_INPUT, 7) /* (K23) GPIO0_12 */
+			J722S_IOPAD(0x0B8, PIN_OUTPUT, 7) /* (W27) GPIO0_45 */
+			J722S_IOPAD(0x1D0, PIN_OUTPUT, 7) /* (E22) GPIO1_22 */
 		>;
 	};
 };
