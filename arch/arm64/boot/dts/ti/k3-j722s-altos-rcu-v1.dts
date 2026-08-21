@@ -106,6 +106,14 @@
 			J722S_IOPAD(0x01a8, PIN_OUTPUT, 7) /* (C26) MCASP0_AFSX.GPIO1_12 */
 		>;
 	};
+
+	pcie0_rc_pins_default: pcie0-rc-default-pins {
+		pinctrl-single,pins = <
+			J722S_IOPAD(0x01b0, PIN_OUTPUT, 7) /* (F24) MCASP0_ACLKR.GPIO1_14 */
+			J722S_IOPAD(0x01f0, PIN_OUTPUT, 7) /* (A23) EXT_REFCLK1.GPIO1_30 */
+			J722S_IOPAD(0x02ac, PIN_INPUT, 7)  /* (F25) PCIE0_CLKREQn.GPIO1_72 */
+		>;
+	};
 };
 
 &mcu_pmx0 {
@@ -825,4 +833,26 @@
 		reg = <0>;
 		spi-max-frequency = <25000000>;
 	};
+};
+
+&main_gpio1 {
+	a23-hog {
+		gpio-hog;
+		gpios = <30 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "CPRSNT";
+	};
+};
+
+&serdes1 {
+	status = "okay";
+};
+
+&pcie0_rc {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie0_rc_pins_default>;
+	reset-gpios = <&main_gpio1 14 GPIO_ACTIVE_HIGH>;
+	phys = <&serdes1_pcie_link>;
+	phy-names = "pcie-phy";
 };
