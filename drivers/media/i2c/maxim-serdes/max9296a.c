@@ -38,6 +38,8 @@
 #define MAX9296A_REG6				0x6
 #define MAX9296A_REG6_GMSL2_X(x)		BIT((x) + 6)
 
+#define MAX9296A_REG13				0x0D
+
 #define MAX9296A_CTRL0				0x10
 #define MAX9296A_CTRL0_LINK_CFG			GENMASK(1, 0)
 #define MAX9296A_CTRL0_REG_ENABLE		BIT(2)
@@ -256,6 +258,7 @@ struct max9296a_chip_info {
 	unsigned int max_register;
 	unsigned int pipe_hw_ids[MAX9296A_PIPES_NUM];
 	unsigned int phy_hw_ids[MAX9296A_PHYS_NUM];
+	u8 dev_id;
 	bool use_atr;
 	bool has_per_link_reset;
 	bool phy0_lanes_0_1_on_second_phy;
@@ -1833,106 +1836,6 @@ static const struct pinmux_ops max9296a_mux_ops = {
 	.set_mux = max9296a_mux_set,
 };
 
-static int max9296a_probe(struct i2c_client *client)
-{
-	struct regmap_config i2c_regmap = max9296a_i2c_regmap;
-	struct device *dev = &client->dev;
-	struct max9296a_priv *priv;
-	struct max_des_ops *ops;
-	int ret;
-
-	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-	if (!priv)
-		return -ENOMEM;
-
-	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
-	if (!ops)
-		return -ENOMEM;
-
-	priv->info = device_get_match_data(dev);
-	if (!priv->info) {
-		dev_err(dev, "Failed to get match data\n");
-		return -ENODEV;
-	}
-
-	priv->dev = dev;
-	priv->client = client;
-	i2c_set_clientdata(client, priv);
-
-	i2c_regmap.max_register = priv->info->max_register;
-	priv->regmap = devm_regmap_init_i2c(client, &i2c_regmap);
-	if (IS_ERR(priv->regmap))
-		return PTR_ERR(priv->regmap);
-
-	priv->gpiod_pwdn = devm_gpiod_get_optional(&client->dev, "powerdown",
-						   GPIOD_OUT_HIGH);
-	if (IS_ERR(priv->gpiod_pwdn))
-		return PTR_ERR(priv->gpiod_pwdn);
-
-	if (priv->gpiod_pwdn) {
-		/* PWDN must be held for 1us for reset */
-		udelay(1);
-
-		gpiod_set_value_cansleep(priv->gpiod_pwdn, 0);
-		/* Maximum power-up time (tLOCK) 4ms */
-		usleep_range(4000, 5000);
-	}
-
-	*ops = max9296a_common_ops;
-
-	ops->versions = priv->info->ops->versions;
-	ops->modes = priv->info->ops->modes;
-	ops->needs_single_link_version = priv->info->ops->needs_single_link_version;
-	ops->needs_unique_stream_id = priv->info->ops->needs_unique_stream_id;
-	ops->fix_tx_ids = priv->info->ops->fix_tx_ids;
-	ops->num_phys = priv->info->ops->num_phys;
-	ops->num_pipes = priv->info->ops->num_pipes;
-	ops->num_links = priv->info->ops->num_links;
-	ops->phys_configs = priv->info->ops->phys_configs;
-	ops->set_pipe_enable = priv->info->ops->set_pipe_enable;
-	ops->set_pipe_stream_id = priv->info->ops->set_pipe_stream_id;
-	ops->set_pipe_tunnel_phy = priv->info->ops->set_pipe_tunnel_phy;
-	ops->set_pipe_tunnel_enable = priv->info->ops->set_pipe_tunnel_enable;
-	ops->use_atr = priv->info->ops->use_atr;
-	ops->tpg_mode = priv->info->ops->tpg_mode;
-	priv->des.ops = ops;
-
-	ret = max9296a_reset(priv);
-	if (ret)
-		return ret;
-
-	priv->pctldesc = (struct pinctrl_desc) {
-		.owner = THIS_MODULE,
-		.name = MAX9296A_PINCTRL_NAME,
-		.pins = max9296a_pins,
-		.npins = ARRAY_SIZE(max9296a_pins),
-		.pctlops = &max9296a_ctrl_ops,
-		.confops = &max9296a_conf_ops,
-		.pmxops = &max9296a_mux_ops,
-		.custom_params = max9296a_cfg_params,
-		.num_custom_params = ARRAY_SIZE(max9296a_cfg_params),
-	};
-
-	ret = devm_pinctrl_register_and_init(dev, &priv->pctldesc, priv, &priv->pctldev);
-	if (ret)
-		return ret;
-
-	ret = pinctrl_enable(priv->pctldev);
-	if (ret)
-		return ret;
-
-	return max_des_probe(client, &priv->des);
-}
-
-static void max9296a_remove(struct i2c_client *client)
-{
-	struct max9296a_priv *priv = i2c_get_clientdata(client);
-
-	max_des_remove(&priv->des);
-
-	gpiod_set_value_cansleep(priv->gpiod_pwdn, 1);
-}
-
 static const struct max_serdes_phys_config max9296a_phys_configs[] = {
 	{ { 4, 4 } },
 };
@@ -1966,6 +1869,7 @@ static const struct max9296a_chip_info max9296a_info = {
 	.phy0_lanes_0_1_on_second_phy = true,
 	.pipe_hw_ids = { 0, 1, 2, 3 },
 	.phy_hw_ids = { 1, 2 },
+	.dev_id = 0x94,
 };
 
 static const struct max_des_ops max96714_ops = {
@@ -2011,6 +1915,7 @@ static const struct max9296a_chip_info max96714_info = {
 	.rlms_adjust_sequence_len = ARRAY_SIZE(max96714_rlms_reg_sequence),
 	.pipe_hw_ids = { 1 },
 	.phy_hw_ids = { 1 },
+	.dev_id = 0xC9,
 };
 
 static const struct max_des_ops max96714f_ops = {
@@ -2039,6 +1944,19 @@ static const struct max9296a_chip_info max96714f_info = {
 	.rlms_adjust_sequence_len = ARRAY_SIZE(max96714_rlms_reg_sequence),
 	.pipe_hw_ids = { 1 },
 	.phy_hw_ids = { 1 },
+	.dev_id = 0xCA,
+};
+
+static const struct max9296a_chip_info max96714r_info = {
+	.ops = &max96714f_ops,
+	.max_register = 0x5011,
+	.polarity_on_physical_lanes = true,
+	.supports_phy_log = true,
+	.rlms_adjust_sequence = max96714_rlms_reg_sequence,
+	.rlms_adjust_sequence_len = ARRAY_SIZE(max96714_rlms_reg_sequence),
+	.pipe_hw_ids = { 1 },
+	.phy_hw_ids = { 1 },
+	.dev_id = 0xCB,
 };
 
 static const struct max_des_ops max96716a_ops = {
@@ -2113,6 +2031,7 @@ static const struct max9296a_chip_info max96716a_info = {
 	.rlms_adjust_sequence_len = ARRAY_SIZE(max96716a_rlms_reg_sequence),
 	.pipe_hw_ids = { 1, 2 },
 	.phy_hw_ids = { 1, 2 },
+	.dev_id = 0xBE,
 };
 
 static const struct max_des_ops max96792a_ops = {
@@ -2145,18 +2064,141 @@ static const struct max9296a_chip_info max96792a_info = {
 	.supports_phy_log = true,
 	.pipe_hw_ids = { 1, 2 },
 	.phy_hw_ids = { 1, 2 },
+	.dev_id = 0xB6,
 };
 
 static const struct of_device_id max9296a_of_table[] = {
 	{ .compatible = "maxim,max9296a", .data = &max9296a_info },
 	{ .compatible = "maxim,max96714", .data = &max96714_info },
 	{ .compatible = "maxim,max96714f", .data = &max96714f_info },
-	{ .compatible = "maxim,max96714r", .data = &max96714f_info },
+	{ .compatible = "maxim,max96714r", .data = &max96714r_info },
 	{ .compatible = "maxim,max96716a", .data = &max96716a_info },
 	{ .compatible = "maxim,max96792a", .data = &max96792a_info },
+	{ .compatible = "maxim,gmsl-csi-deserializer" },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, max9296a_of_table);
+
+static int max9296a_probe(struct i2c_client *client)
+{
+	struct regmap_config i2c_regmap = max9296a_i2c_regmap;
+	struct device *dev = &client->dev;
+	struct max9296a_priv *priv;
+	struct max_des_ops *ops;
+	int ret;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
+	if (!ops)
+		return -ENOMEM;
+
+	priv->gpiod_pwdn = devm_gpiod_get_optional(&client->dev, "powerdown",
+						   GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->gpiod_pwdn))
+		return PTR_ERR(priv->gpiod_pwdn);
+
+	if (priv->gpiod_pwdn) {
+		/* PWDN must be held for 1us for reset */
+		udelay(1);
+
+		gpiod_set_value_cansleep(priv->gpiod_pwdn, 0);
+		/* Maximum power-up time (tLOCK) 4ms */
+		usleep_range(4000, 5000);
+	}
+
+	priv->info = device_get_match_data(dev);
+	if (!priv->info) {
+		char addr[] = {0x00, MAX9296A_REG13};
+		char dev_id;
+		int i;
+		ret = i2c_master_send(client, addr, 2);
+		if (ret < 0)
+			return ret;
+		ret = i2c_master_recv(client, &dev_id, 1);
+		if (ret < 0)
+			return ret;
+		for (i = 0; i < ARRAY_SIZE(max9296a_of_table); ++i) {
+			const struct max9296a_chip_info *info = max9296a_of_table[i].data;
+			if (!info)
+				break;
+			if (info->dev_id == dev_id) {
+				priv->info = info;
+				dev_info(dev, "Matched %s\n", max9296a_of_table[i].compatible);
+				break;
+			}
+		}
+	}
+	if (!priv->info) {
+		dev_err(dev, "Failed to get match data\n");
+		return -ENODEV;
+	}
+
+	priv->dev = dev;
+	priv->client = client;
+	i2c_set_clientdata(client, priv);
+
+	i2c_regmap.max_register = priv->info->max_register;
+	priv->regmap = devm_regmap_init_i2c(client, &i2c_regmap);
+	if (IS_ERR(priv->regmap))
+		return PTR_ERR(priv->regmap);
+
+	*ops = max9296a_common_ops;
+
+	ops->versions = priv->info->ops->versions;
+	ops->modes = priv->info->ops->modes;
+	ops->needs_single_link_version = priv->info->ops->needs_single_link_version;
+	ops->needs_unique_stream_id = priv->info->ops->needs_unique_stream_id;
+	ops->fix_tx_ids = priv->info->ops->fix_tx_ids;
+	ops->num_phys = priv->info->ops->num_phys;
+	ops->num_pipes = priv->info->ops->num_pipes;
+	ops->num_links = priv->info->ops->num_links;
+	ops->phys_configs = priv->info->ops->phys_configs;
+	ops->set_pipe_enable = priv->info->ops->set_pipe_enable;
+	ops->set_pipe_stream_id = priv->info->ops->set_pipe_stream_id;
+	ops->set_pipe_tunnel_phy = priv->info->ops->set_pipe_tunnel_phy;
+	ops->set_pipe_tunnel_enable = priv->info->ops->set_pipe_tunnel_enable;
+	ops->use_atr = priv->info->ops->use_atr;
+	ops->tpg_mode = priv->info->ops->tpg_mode;
+	priv->des.ops = ops;
+
+	ret = max9296a_reset(priv);
+	if (ret)
+		return ret;
+
+	priv->pctldesc = (struct pinctrl_desc) {
+		.owner = THIS_MODULE,
+		.name = MAX9296A_PINCTRL_NAME,
+		.pins = max9296a_pins,
+		.npins = ARRAY_SIZE(max9296a_pins),
+		.pctlops = &max9296a_ctrl_ops,
+		.confops = &max9296a_conf_ops,
+		.pmxops = &max9296a_mux_ops,
+		.custom_params = max9296a_cfg_params,
+		.num_custom_params = ARRAY_SIZE(max9296a_cfg_params),
+	};
+
+	ret = devm_pinctrl_register_and_init(dev, &priv->pctldesc, priv, &priv->pctldev);
+	if (ret)
+		return ret;
+
+	ret = pinctrl_enable(priv->pctldev);
+	if (ret)
+		return ret;
+
+	return max_des_probe(client, &priv->des);
+}
+
+static void max9296a_remove(struct i2c_client *client)
+{
+	struct max9296a_priv *priv = i2c_get_clientdata(client);
+
+	max_des_remove(&priv->des);
+
+	gpiod_set_value_cansleep(priv->gpiod_pwdn, 1);
+}
 
 static struct i2c_driver max9296a_i2c_driver = {
 	.driver	= {

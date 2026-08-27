@@ -165,7 +165,7 @@
 	clock-frequency = <400000>;
 
 	gmsl-deserializer@28 {
-		compatible = "maxim,max96716a";
+		compatible = "maxim,gmsl-csi-deserializer";
 		reg = <0x28>;
 		powerdown-gpios = <&main_gpio1 18 GPIO_ACTIVE_LOW>;
 		vdd-supply = <&vsys_io_1v2>;
@@ -468,7 +468,7 @@
 	clock-frequency = <400000>;
 
 	gmsl-deserializer@28 {
-		compatible = "maxim,max96716a";
+		compatible = "maxim,gmsl-csi-deserializer";
 		reg = <0x28>;
 		powerdown-gpios = <&main_gpio1 19 GPIO_ACTIVE_LOW>;
 		vdd-supply = <&vsys_io_1v2>;
