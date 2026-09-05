@@ -1488,7 +1488,7 @@ static int max96717_init(struct max_ser *ser)
 		return ret;
 
 	if (ctrl1 & MAX96717_CTRL1_CXTP_A &&
-	    (reg1 & MAX96717_REG1_TX_RATE) ==
+	    (reg1 & MAX96717_REG1_TX_RATE) >=
 	    FIELD_PREP(MAX96717_REG1_TX_RATE, MAX96717_REG1_TX_RATE_6GBPS)) {
 		ret = regmap_set_bits(priv->regmap, MAX96717_RLMSCE,
 				      MAX96717_RLMSCE_ENMINUS_REG |
@@ -1864,7 +1864,8 @@ static const struct max96717_chip_info max9295d_info = {
 };
 
 static const struct max96717_chip_info max96717_info = {
-	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE),
+	.modes = BIT(MAX_SERDES_GMSL_PIXEL_MODE) |
+		 BIT(MAX_SERDES_GMSL_TUNNEL_MODE),
 	.supports_3_data_lanes = true,
 	.supports_pkt_cnt = true,
 	.supports_noncontinuous_clock = true,

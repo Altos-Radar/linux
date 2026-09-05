@@ -197,6 +197,13 @@
 #define MAX9296A_MIPI_TX52_TUN_DEST		BIT(1)
 #define MAX9296A_MIPI_TX52_TUN_EN		BIT(0)
 
+#define MAX9296A_DP_ORSTB_CTL				0x577
+#define MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI3_CHKB		BIT(6)
+#define MAX9296A_DP_ORSTB_CTL_DP_RST_STABLE_CHKB	BIT(5)
+#define MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI2_CHKB		BIT(4)
+#define MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI_CHKB		BIT(3)
+#define MAX9296A_DP_ORSTB_CTL_DP_RST_VP_CHKB		BIT(2)
+
 #define MAX9296A_GMSL1_EN			0xf00
 #define MAX9296A_GMSL1_EN_LINK_EN		GENMASK(1, 0)
 
@@ -759,7 +766,17 @@ static int max9296a_reset(struct max9296a_priv *priv)
 
 	msleep(100);
 
-	return max9296a_wait_for_device(priv);
+	ret = max9296a_wait_for_device(priv);
+	if (ret)
+		return ret;
+
+	// These bits don't exist on max9296a..
+	return regmap_set_bits(priv->regmap, MAX9296A_DP_ORSTB_CTL,
+			       MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI3_CHKB |
+			       MAX9296A_DP_ORSTB_CTL_DP_RST_STABLE_CHKB |
+			       MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI2_CHKB |
+			       MAX9296A_DP_ORSTB_CTL_DP_RST_MIPI_CHKB |
+			       MAX9296A_DP_ORSTB_CTL_DP_RST_VP_CHKB);
 }
 
 static unsigned int max9296a_pipe_id(struct max9296a_priv *priv,
