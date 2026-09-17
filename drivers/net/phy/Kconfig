@@ -400,6 +400,11 @@ config DP83TC811_PHY
 	help
 	  Supports the DP83TC811 PHY.
 
+config DP83TC812_PHY
+	tristate "Texas Instruments DP83TC812/813/814 PHYs"
+	help
+	  Supports the DP83TC812, DP83TC813, and DP83TC814 PHYs.
+
 config DP83848_PHY
 	tristate "Texas Instruments DP83848 PHY"
 	help
