@@ -73,7 +73,6 @@ const struct reg_seq master_mode_regs[] = {
 	{ 0x08F0, 0x0025 },
 	{ 0x08F1, 0x0029 },
 	{ 0x08F2, 0x002D },
-	{ 0x0456, 0x0021 },  // Reduce slew rate of MAC IO drivers
 	{ 0x085A, 0x3000 },  // Improve RF immunity performance
 	{ 0x085B, 0x3000 },
 	{ 0x0189, 0x0018 },  // TC10 Interoperability
@@ -101,7 +100,6 @@ const struct reg_seq slave_mode_regs[] = {
 	{ 0x08F0, 0x0025 },
 	{ 0x08F1, 0x0029 },
 	{ 0x08F2, 0x002D },
-	{ 0x0456, 0x0021 },  // Reduce slew rate of MAC IO drivers
 	{ 0x085A, 0x3000 },  // Improve RF immunity performance
 	{ 0x085B, 0x3000 },
 	{ 0x0189, 0x0018 },  // TC10 Interoperability
