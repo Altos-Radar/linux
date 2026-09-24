@@ -144,12 +144,18 @@ static int dp83812_write_reg_seq(struct phy_device *phydev, const struct reg_seq
 	return 0;
 }
 
+static int dp83812_soft_reset(struct phy_device *phydev)
+{
+	int ret = phy_write(phydev, DP83TC812_PHYRCR, DP83TC812_PHYRCR_HARD_RESET);
+	return ret < 0 ? ret : 0;
+}
+
 static int dp83812_config_init(struct phy_device *phydev)
 {
 	int ret;
 
 	ret = genphy_c45_pma_baset1_read_master_slave(phydev);
-	if (!ret)
+	if (ret)
 		return ret;
 
 	if (phydev->master_slave_state == MASTER_SLAVE_STATE_MASTER) {
@@ -159,6 +165,8 @@ static int dp83812_config_init(struct phy_device *phydev)
 	} else {
 		return -EINVAL;
 	}
+	if (ret)
+		return ret;
 
 	phy_clear_bits_mmd(phydev, MDIO_MMD_VEND2, DP83TC812_RGMII_CTRL,
 			   DP83TC812_RGMII_CTRL_CFG_RGMII_EN);
@@ -255,6 +263,7 @@ static struct phy_driver dp83812_driver[] = {
 	{
 		PHY_ID_MATCH_MODEL(DP83TC812_PHY_ID),
 		.name = "TI DP83TC812/813/814",
+		.soft_reset = dp83812_soft_reset,
 		.config_init = dp83812_config_init,
 		.get_features = genphy_c45_pma_read_ext_abilities,
 		.suspend = genphy_suspend,
