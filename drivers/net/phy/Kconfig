@@ -402,6 +402,9 @@ config DP83TC811_PHY
 
 config DP83TC812_PHY
 	tristate "Texas Instruments DP83TC812/813/814 PHYs"
+	select GENERIC_PINCONF
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
 	help
 	  Supports the DP83TC812, DP83TC813, and DP83TC814 PHYs.
 

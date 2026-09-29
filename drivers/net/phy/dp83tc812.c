@@ -5,12 +5,20 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/phy.h>
+#include <linux/pinctrl/pinctrl.h>
+#include <linux/pinctrl/pinmux.h>
+#include <linux/pinctrl/pinconf.h>
+#include <linux/pinctrl/pinconf-generic.h>
 
 #define DP83TC812_PHY_ID	0x2000a261
 
 #define DP83TC812_PHYRCR		0x1F
 #define DP83TC812_PHYRCR_HARD_RESET	BIT(15)
 #define DP83TC812_PHYRCR_SOFT_RESET	BIT(14)
+
+#define DP83TC812_IO_MUX_CFG_1		0x0452
+#define DP83TC812_IO_MUX_CFG_2		0x0453
+#define DP83TC812_LED1_CLKOUT_ANA_CTRL	0x045F
 
 #define DP83TC812_RGMII_CTRL 0x0600
 #define DP83TC812_RGMII_CTRL_CFG_RGMII_EN BIT(3)
@@ -30,6 +38,12 @@
 #define DP83TC812_DSP_REG_71_SQI 	GENMASK(3, 1)
 
 #define DP83TC812_SQI_MAX		7
+
+struct dp83812_priv {
+	struct phy_device *phydev;
+	struct pinctrl_desc pctldesc;
+	struct pinctrl_dev *pctldev;
+};
 
 // This is like reg_sequence in regmap, but specific to TI since it maps the most significant nibble to MMD values
 struct reg_seq {
@@ -150,9 +164,166 @@ static int dp83812_soft_reset(struct phy_device *phydev)
 	return ret < 0 ? ret : 0;
 }
 
+#define DP83812_PIN(n) PINCTRL_PIN(n, "led_" __stringify(n))
+
+static const struct pinctrl_pin_desc dp83812_pins[] = {
+	DP83812_PIN(0),
+	DP83812_PIN(1),
+	DP83812_PIN(2),
+};
+
+#define DP83812_GROUP_PINS(name, ...) static const unsigned int name ## _pins[] = { __VA_ARGS__ }
+
+DP83812_GROUP_PINS(led_0, 0);
+DP83812_GROUP_PINS(led_1, 1);
+DP83812_GROUP_PINS(led_2, 2);
+
+#define DP83812_GROUP(name) PINCTRL_PINGROUP(__stringify(name), name ## _pins, ARRAY_SIZE(name ## _pins))
+
+static const struct pingroup dp83812_ctrl_groups[] = {
+	DP83812_GROUP(led_0),
+	DP83812_GROUP(led_1),
+	DP83812_GROUP(led_2),
+};
+
+static int dp83812_ctrl_get_groups_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(dp83812_ctrl_groups);
+}
+
+static const char *dp83812_ctrl_get_group_name(struct pinctrl_dev *pctldev, unsigned selector)
+{
+	return dp83812_ctrl_groups[selector].name;
+}
+
+static int dp83812_ctrl_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
+				       const unsigned **pins, unsigned *num_pins)
+{
+	*pins = (unsigned *)dp83812_ctrl_groups[selector].pins;
+	*num_pins = dp83812_ctrl_groups[selector].npins;
+	return 0;
+}
+
+static const struct pinctrl_ops dp83812_ctrl_ops = {
+	.get_groups_count = dp83812_ctrl_get_groups_count,
+	.get_group_name = dp83812_ctrl_get_group_name,
+	.get_group_pins = dp83812_ctrl_get_group_pins,
+	.dt_node_to_map = pinconf_generic_dt_node_to_map_pin,
+	.dt_free_map = pinconf_generic_dt_free_map,
+};
+
+static const char * const dp83812_led_groups[] = {
+	"led_0",
+	"led_1",
+	"led_2",
+};
+
+enum dp83812_func {
+	dp83812_func_led,
+	dp83812_func_clk,
+	dp83812_func_wol,
+	dp83812_func_undervoltage,
+	dp83812_func_1588_tx,
+	dp83812_func_1588_rx,
+	dp83812_func_esd,
+	dp83812_func_int,
+};
+
+#define DP83812_FUNC(name)		\
+	[dp83812_func_ ## name] =	\
+		PINCTRL_PINFUNCTION(__stringify(name), dp83812_led_groups, ARRAY_SIZE(dp83812_led_groups))
+
+static const struct pinfunction dp83812_functions[] = {
+	DP83812_FUNC(led),
+	DP83812_FUNC(clk),
+	DP83812_FUNC(wol),
+	DP83812_FUNC(undervoltage),
+	DP83812_FUNC(1588_tx),
+	DP83812_FUNC(1588_rx),
+	DP83812_FUNC(esd),
+	DP83812_FUNC(int),
+};
+
+static int dp83812_mux_get_functions_count(struct pinctrl_dev *pctldev)
+{
+	return ARRAY_SIZE(dp83812_functions);
+}
+
+static const char *dp83812_mux_get_function_name(struct pinctrl_dev *pctldev, unsigned selector)
+{
+	return dp83812_functions[selector].name;
+}
+
+static int dp83812_mux_get_groups(struct pinctrl_dev *pctldev,
+				  unsigned selector,
+				  const char * const **groups,
+				  unsigned * const num_groups)
+{
+	*groups = dp83812_functions[selector].groups;
+	*num_groups = dp83812_functions[selector].ngroups;
+	return 0;
+}
+
+static int dp83812_mux_set(struct pinctrl_dev *pctldev, unsigned selector, unsigned group)
+{
+	struct dp83812_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+	uint16_t reg, offset, ana_mux;
+	int ret;
+
+	switch (group) {
+	case 0:
+		reg = DP83TC812_IO_MUX_CFG_1;
+		offset = 0;
+		break;
+	case 1:
+		reg = DP83TC812_IO_MUX_CFG_1;
+		offset = 8;
+		break;
+	case 2:
+		reg = DP83TC812_IO_MUX_CFG_2;
+		offset = 0;
+		break;
+	}
+
+	ret = phy_modify_mmd(priv->phydev, MDIO_MMD_VEND2, reg, 0x3 << offset, selector << offset);
+	if (ret < 0)
+		return ret;
+
+	switch (group) {
+	case 0:
+		return 0;
+	case 1:
+		offset = 2;
+		break;
+	case 2:
+		offset = 0;
+		break;
+	}
+	if (selector == dp83812_func_clk)
+		ana_mux = 0;
+	else
+		ana_mux = 3;
+	return phy_modify_mmd(priv->phydev, MDIO_MMD_VEND2, DP83TC812_LED1_CLKOUT_ANA_CTRL, 0x3 << offset, ana_mux << offset);
+}
+
+static const struct pinmux_ops dp83812_mux_ops = {
+	.get_functions_count = dp83812_mux_get_functions_count,
+	.get_function_name = dp83812_mux_get_function_name,
+	.get_function_groups = dp83812_mux_get_groups,
+	.set_mux = dp83812_mux_set,
+};
+
 static int dp83812_config_init(struct phy_device *phydev)
 {
+	struct dp83812_priv *priv;
 	int ret;
+
+	priv = devm_kzalloc(&phydev->mdio.dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->phydev = phydev;
+	phydev->priv = priv;
 
 	ret = genphy_c45_pma_baset1_read_master_slave(phydev);
 	if (ret)
@@ -220,8 +391,20 @@ static int dp83812_config_init(struct phy_device *phydev)
 	phydev->speed = SPEED_100;
 	phydev->duplex = DUPLEX_FULL;
 
-	return 0;
+	priv->pctldesc = (struct pinctrl_desc) {
+		.owner = THIS_MODULE,
+		.name = "dp83812-pinctrl",
+		.pins = dp83812_pins,
+		.npins = ARRAY_SIZE(dp83812_pins),
+		.pctlops = &dp83812_ctrl_ops,
+		.pmxops = &dp83812_mux_ops,
+	};
 
+	ret = devm_pinctrl_register_and_init(&phydev->mdio.dev, &priv->pctldesc, priv, &priv->pctldev);
+	if (ret)
+		return ret;
+
+	return pinctrl_enable(priv->pctldev);
 }
 
 static int dp83812_config_aneg(struct phy_device *phydev)
