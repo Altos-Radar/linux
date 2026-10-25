@@ -1583,7 +1583,8 @@ static int max_des_ser_attach_addr(struct max_des_priv *priv, u32 chan_id,
 	if (ret) {
 		dev_err(priv->dev, "Cannot find serializer for link %u\n",
 			link->index);
-		return -ENOENT;
+		link->enabled = false;
+		return 0;
 	}
 
 	link->version = i;
